@@ -1,0 +1,85 @@
+nREPL server started on port 56274 on host 127.0.0.1 - nrepl://127.0.0.1:56274
+REPL-y 0.3.5, nREPL 0.2.6
+Clojure 1.7.0
+OpenJDK 64-Bit Server VM 1.8.0_51-b16
+    Docs: (doc function-name-here)
+          (find-doc "part-of-name-here")
+  Source: (source function-name-here)
+ Javadoc: (javadoc java-object-or-class-here)
+    Exit: Control+D or (exit) or (quit)
+ Results: Stored in vars *1, *2, *3, an exception in *e
+
+pressspan.core=>             #_=>             #_=>             #_=>             #_=> nil
+pressspan.graph=> 
+pressspan.graph=> nil
+pressspan.graph=> 
+pressspan.graph=> #'pressspan.graph/select-fragment
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/create-genome
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/add-chromosome
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/select-chromosome
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/link-frags
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=> #'pressspan.graph/link-with-chr
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/select-fragment
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/register-fragment
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> #'pressspan.graph/graph-test-fn
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/structuretest
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> 
+pressspan.graph=> 
+Testing pressspan.graph
+Database used:  memory:test
+Database successfully created
+select-chromosome - No such chromosome: 1
+select-chromosome - No such chromosome: error
+({:p3 1, :p5 11, :chr 1} {:p3 17, :p5 25, :chr 1})
+
+FAIL in (structuretest) (form-init958702555460656760.clj:15)
+expected: (= 1 (count (og/get-links f1 f2)))
+  actual: (not (= 1 0))
+
+Ran 1 tests containing 7 assertions.
+1 failures, 0 errors.
+{:test 1, :pass 6, :fail 1, :error 0, :type :summary}
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/link-frags
+pressspan.graph=> 
+Testing pressspan.graph
+
+Deleting database...
+Database used:  memory:test
+Database successfully created
+select-chromosome - No such chromosome: 1
+select-chromosome - No such chromosome: error
+({:p3 1, :p5 11, :chr 1, :out #{#object[com.orientechnologies.orient.core.record.impl.ODocument 0x6a7b8b2 splice#11:0{out:#10:0,in:#10:1,label:splice,depth:1} v1]}} {:p3 17, :p5 25, :chr 1, :in #{#object[com.orientechnologies.orient.core.record.impl.ODocument 0x6a7b8b2 splice#11:0{out:#10:0,in:#10:1,label:splice,depth:1} v1]}})
+
+Ran 1 tests containing 7 assertions.
+0 failures, 0 errors.
+{:test 1, :pass 7, :fail 0, :error 0, :type :summary}
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> 
+pressspan.graph=> CompilerException java.lang.ClassNotFoundException: clojure.java.io.reader, compiling:(/tmp/form-init958702555460656760.clj:8:13) 
+
+
+pressspan.graph=> nil
+pressspan.graph=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=>              #_=> #'pressspan.graph/lazy-file
+pressspan.graph=> 
