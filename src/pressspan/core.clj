@@ -3,9 +3,16 @@
   (:require pressspan.io
             pressspan.saminput
             pressspan.graph)
-  (:gen-class))
+   (:gen-class))
 
 (require '[clojure.tools.cli :refer [parse-opts]])
+;(require '[taoensso.timbre :as timbre
+;           :refer (log  trace  debug  info  warn  error  fatal  report
+;                        logf tracef debugf infof warnf errorf fatalf reportf
+;                        spy get-env log-env)]
+;         '[taoensso.timbre.profiling :as profiling
+;           :refer (pspy pspy* profile defnp p p*)])
+(use '[taoensso.timbre.profiling])
 
 
 (def cli-options
@@ -93,9 +100,20 @@
                      identity)
                    (:add-all funs))
             funs (assoc funs :add-all adder)]
+
+        (println "Analysing file...")
+        (time
         (if (= "remote" (first (clojure.string/split (:database options) #":")))
           (pressspan.graph/create-genome (:database options) (:in options) funs {:user (:user options)
                                                                                  :pass (:pass options)})
-          (pressspan.graph/create-genome (:database options) (:in options) funs)))
-      (println "No functions known to treat" (last (clojure.string/split (:in options) #"\.")) "format"))
+          (pressspan.graph/create-genome (:database options) (:in options) funs))))
+      (println "No functions known to treat" (last (clojure.string/split (:in options) #"\.")) "format. Why don't you create them?"))
     ))
+
+
+(if false
+  (profile :info
+           :Arithmetic
+           (dotimes [n 3]
+             (p :pressspan (-main "-i" "test/data/1k.sam"))
+             (clj-orient.core/delete-db! (clj-orient.graph/open-graph-db! "memory:data" "admin" "admin")))))

@@ -2,9 +2,17 @@
   (:require [clj-orient.core :as oc]
             [clj-orient.graph :as og]
             [clj-orient.query :as oq]
-            [clojure.data.int-map :as im])) ; hm... seems to cast int-map to map?
+            [clojure.data.int-map :as im]))
+;  (:require
+;    [taoensso.timbre :as timbre
+;      :refer (log  trace  debug  info  warn  error  fatal  report
+;              logf tracef debugf infof warnf errorf fatalf reportf
+;              spy get-env log-env)]
+;    [taoensso.timbre.profiling :as profiling
+;      :refer (pspy pspy* profile defnp p p*)])) ; hm... seems to cast int-map to map?
 
-(use '[clojure.test])
+(use '[clojure.test]
+     '[taoensso.timbre.profiling])
 
 (declare graph-test-fn
          select-fragment
@@ -16,11 +24,19 @@
 (def db-user "admin")
 (def db-pass "admin")
 
-(def circulars (ref #{}))
-(def multis (ref #{}))
 
+(defn init-database!
+  "Opens a database from global parameters
+  db-name, db-user, db-pass.
+  Initialises global parameters
+  circulars, multis
+  Creates required datatypes to store a genome."
+  []
+  ; Side-effects!
+  (def circulars (ref #{}))
+  (def multis (ref #{}))
 
-(defn init-database []
+  
   (og/create-vertex-type! :genome)
     (og/create-vertex-type! :chromosome)
     (og/create-vertex-type! :fragment)
@@ -41,18 +57,17 @@
         (println e))))
 
 
-(defn process-header
+(defnp process-header
   [lines head? process]
   (doseq [line lines :while (head? line)]
     (if-let [info (process line)]
       (add-chromosome (:id info) (:len info)))))
 
 
-(defn process-data
+(defnp process-data
   [lines get-data add-all head?]
-  (doseq [line lines]
-    (if-not (head? line)
-      (add-all (get-data line)))))
+  (doseq [line (drop-while head? lines)]
+    (add-all (get-data line))))
 
 
 (defn create-genome
@@ -86,14 +101,14 @@
   (println "Opening" db-name)
   (oc/with-db
     (og/open-graph-db! db-name db-user db-pass)
-    (init-database)
+    (init-database!)
     (if-let [file (pressspan.io/lazy-file file-name)]
       (do
         (process-header file (:head? fns) (:header-parser fns))
         (process-data file (:data-parser fns) (or (:add-all fns) register-fragment) (:head? fns))))))
 
 
-(defn add-chromosome
+(defnp add-chromosome
   "creates an empty chromosome with lookup-id [id] and a length of [len] basepairs,
    registers and links it with the genome graph"
   [id len]
@@ -109,7 +124,7 @@
       (oc/save! (assoc root :chrs (assoc (:chrs root) id (:#rid chr)))))))
 
     
-(defn select-chromosome
+(defnp select-chromosome
   "selects a chromosome by [id]-string from the database and returns it"
   [id]
   (if id
@@ -120,7 +135,7 @@
         nil))))
 
 
-(defn link-frags
+(defnp link-frags
   "link [up-el] => [dn-el]
   [count] increment link counter if non-nil
   returns the link"
@@ -132,12 +147,17 @@
       (oc/save! (og/link! up-el :splice {:depth 1} dn-el)))))
 
 
-(defn link-with-chr
+;(defnp link-with-chr
+;  [frag link pos chr]
+;  (let [newlink (assoc chr link (p :newlink (assoc (link chr) pos (:#rid frag))))] (p :savelink (oc/save! newlink))))
+
+(defnp link-with-chr
   [frag link pos chr]
-  (oc/save! (assoc chr link (assoc (link chr) pos (:#rid frag)))))
+  (oc/with-tx
+    (oc/save! (update-in chr [link] into {pos (:#rid frag)}))))
 
 
-(defn select-fragment
+(defnp select-fragment
   "selects and returns a fragment from the database
    [chr] chromosome or chromosome id-string
    [dir] :p3 or :p5 for 3' or 5' end
@@ -149,21 +169,18 @@
                 (if (= dir :p5) :mp5frags :mp3frags))
           pos (str pos)]
       (if-let [orid (get (end chrom) pos)]
-        (try
-          (oc/with-tx (oc/load orid))
-          (catch Exception e
-            (println e)))))))
+        (oc/load orid)))))
 
 
-(defn register-fragment
+(defnp register-fragment
   "creates a fragment, registers and links it within the chromosome database
   performs a check before creation to avoid duplicates
   [data] hash-map of fragment properties"
   [{:keys [prev next chr p3 p5 dir]}]    ; dir in {:plus, :minus}, hash-maps {prev, next}
 ;  (println "register -> chr:" chr "p5:" p5 "\tp3:" p3 "\tnext:" next "  prev:" prev)
   (let [frag (or (select-fragment chr :p5 p5 dir)
-                 (oc/with-tx
-                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir}))))
+                 (p :create-fragment (oc/with-tx
+                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir})))))
         chr (select-chromosome chr)
         [l5 l3] (if (= dir :plus) [:p5frags :p3frags] [:mp5frags :mp3frags])]
     (if next
@@ -196,6 +213,29 @@
          (alter circulars conj (:#rid frag)))))) frag)
 
 
+;; Traversing the database requieres casting to and from record-ids
+;; as different fetches of the same element may or may not be unique
+
+(defn get-neighbours-
+  "Helper to traverse a graph from the database."
+  [el]
+  (let [n-coll (for [edge (og/get-edges (oc/load el) :both :splice)]
+                 ((juxt #(og/get-vertex % :in)
+                        #(og/get-vertex % :out))
+                  edge))]
+    (into #{} (map :#rid (apply concat n-coll)))))
+(defn get-subgraph
+  "Get a sequence of frags linked to [start] using a BFS approach
+  Needs access to an open database."
+  [start]
+  (let [walk
+        (fn walk [known this]
+          (if-let [next-el (first (clojure.set/difference (get-neighbours- this) known))]
+            (lazy-seq
+             (cons this
+                   (walk (conj known this) next-el)))))] (walk #{} start)))
+
+
 (deftest structuretest
   (if (oc/db-exists? "memory:test")
     (do (println "\nDeleting database...")
@@ -220,7 +260,7 @@
   (if (oc/db-exists? "memory:test")
     (do (println "\nDeleting database...")
         (oc/delete-db! (og/open-graph-db! "memory:test" "admin" "admin"))))
-  (create-genome "memory:test" "/home/hermann/5_out.sam"
+  (create-genome "memory:test" "test/data/5_out.sam"
                  {:head?         pressspan.saminput/header-line?
                   :header-parser pressspan.saminput/parse-header-line
                   :data-parser   pressspan.saminput/make-frag
@@ -228,15 +268,11 @@
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
     (is (= 5  (count (oq/native-query :chromosome {}))))
     (is (= 14 (count (oq/native-query :fragment {}))))
-    (is (< 0 (og/count-edges))))
+    (is (< 0 (og/count-edges)))
+    (is (= 3 (count (get-subgraph (first @multis))))))
   (is (= 12  (count @multis))))
 
 ; (run-tests)
-
-(defn list-frags [chr]
-  (for [frag (:p5frags chr)]
-    (let [el (oc/load frag)]
-      (format "    %3d-%3d" (:p5 el) (:p3 el)))))
 
 (if false
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
