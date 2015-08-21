@@ -115,5 +115,5 @@
   (profile :info
            :Arithmetic
            (dotimes [n 3]
-             (p :pressspan (-main "-i" "test/data/1k.sam"))
+             (p :pressspan (-main "-i" "test/data/large.sam"))
              (clj-orient.core/delete-db! (clj-orient.graph/open-graph-db! "memory:data" "admin" "admin")))))

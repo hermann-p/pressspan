@@ -23,6 +23,9 @@
 (def db-name "memory:test")
 (def db-user "admin")
 (def db-pass "admin")
+(def chromosomes {})
+
+(def rid #(:#rid %))
 
 
 (defn init-database!
@@ -35,7 +38,7 @@
   ; Side-effects!
   (def circulars (ref #{}))
   (def multis (ref #{}))
-  (def chromosomes (ref {}))
+  (def chromosomes {})
 
   
   (og/create-vertex-type! :genome)
@@ -60,15 +63,46 @@
 
 (defnp process-header
   [lines head? process]
-  (doseq [line lines :while (head? line)]
-    (if-let [info (process line)]
-      (add-chromosome (:id info) (:len info)))))
+  (let [inserter
+        (fn [chrs chr-data]
+          (let [chr-id (:id chr-data)
+                chr-data (assoc chr-data
+                           :p3frags (im/int-map)
+                           :p5frags (im/int-map)
+                           :mp3frags (im/int-map)
+                           :mp5frags (im/int-map))]
+            (assoc! chrs chr-id chr-data)))
+
+        all-chromosomes
+        (reduce inserter (transient {})
+                (filter (complement nil?)
+                        (for [line lines :while (head? line)]
+                          (process line))))]
+    (persistent! all-chromosomes)))
 
 
 (defnp process-data
-  [lines get-data add-all head?]
-  (doseq [line (drop-while head? lines)]
-    (add-all (get-data line))))
+  [chrs lines get-data add-all head?]
+  (let [inserter
+        (fn [chrs frag]
+          (let [[l5 l3] (if (= :plus (:dir frag))
+                          [:p5frags :p3frags]
+                          [:mp5frags :mp3frags])
+                frag (add-all chrs frag)
+                orid (rid frag)
+                chr (get chrs (:chr frag))]
+            (assoc! chrs (:chr frag) 
+                    (assoc chr
+                      l5 (into (l5 chr) {(:p5 frag) orid})
+                      l3 (into (l3 chr) {(:p3 frag) orid})))))
+        all-chrs
+        (reduce inserter (transient chrs)
+                (for [line (drop-while head? lines)]
+                  (get-data line)))]
+    (persistent! all-chrs)))
+  
+;  (doseq [line (drop-while head? lines)]
+;    (add-all (get-data line))))
 
 
 (defn create-genome
@@ -83,6 +117,7 @@
                               or nil to only insert"
   [gname file-name fns & credentials]
   (def db-name gname)
+  (println "Processing" file-name)
   (if credentials
     (do
       (println "Using provided database credentials")
@@ -104,9 +139,14 @@
     (og/open-graph-db! db-name db-user db-pass)
     (init-database!)
     (if-let [file (pressspan.io/lazy-file file-name)]
-      (do
-        (process-header file (:head? fns) (:header-parser fns))
-        (process-data file (:data-parser fns) (or (:add-all fns) register-fragment) (:head? fns))))))
+      (def chromosomes
+        (-> (process-header file
+                            (:head? fns)
+                            (:header-parser fns))
+            (process-data file
+                          (:data-parser fns)
+                          (or (:add-all fns) register-fragment)
+                          (:head? fns)))))))
 
 
 ;(defnp add-chromosome
@@ -134,8 +174,7 @@
                   :p3frags (im/int-map)   ; 3' +strand links
                   :mp5frags (im/int-map)  ; 5' -strand links
                   :mp3frags (im/int-map)}] ; 3' -strand links
-    (dosync
-     (commute chromosomes into {id chr-data}))))
+    (dosync (commute chromosomes into {id chr-data}))))
 
 
 ;(defnp select-chromosome
@@ -150,9 +189,9 @@
 
 
 (defnp select-chromosome
-  [id]
+  [chr id]
   (if id
-    (get @chromosomes id)))
+    (get chr id)))
 
 
 (defnp link-frags
@@ -167,15 +206,10 @@
       (oc/save! (og/link! up-el :splice {:depth 1} dn-el)))))
 
 
-;(defnp link-with-chr
-;  [frag link pos chr]
-;  (let [newlink (assoc chr link (p :newlink (assoc (link chr) pos (:#rid frag))))] (p :savelink (oc/save! newlink))))
-
 (defnp link-with-chr
-  [frag link pos chr]
-  (prn "link-with-frag\nfrag:" (dissoc frag :next :prev :in :out)
-       "\nlink:" link "pos:" pos "on chromosome" (:id chr))
-  (dosync (commute chromosomes assoc (:id chr) (assoc chr link {pos (:#rid frag)}))))
+  [frag link pos chr-id]
+  (dosync (alter chromosomes assoc chr-id (assoc (select-chromosome chr-id)
+                                              link {pos (:#rid frag)}))))
 
 
 (defnp select-fragment
@@ -183,35 +217,38 @@
    [chr] chromosome or chromosome id-string
    [dir] :p3 or :p5 for 3' or 5' end
    [pos] position of 3' or 5' end"
-  [chr dir pos strandiness]
-  (if-let [chrom (select-chromosome (if (map? chr) (:id chr) chr))] ; select chromosome if neccessary, proceed only if found
+  [chrs chr dir pos strandiness]
+  (if-let [chrom (select-chromosome chrs (if (map? chr) (:id chr) chr))] ; select chromosome if neccessary, proceed only if found
     (let [end (if (= strandiness :plus)
                 (if (= dir :p5) :p5frags :p3frags)
                 (if (= dir :p5) :mp5frags :mp3frags))]
 ;          pos (str pos)]
       (if-let [orid (get (end chrom) pos)]
-        (oc/load orid)))))
+        (try
+          (oc/load orid)
+          (catch Exception e
+            orid))))))
 
 
 (defnp register-fragment
   "creates a fragment, registers and links it within the chromosome database
   performs a check before creation to avoid duplicates
   [data] hash-map of fragment properties"
-  [{:keys [prev next chr p3 p5 dir]}]    ; dir in {:plus, :minus}, hash-maps {prev, next}
+  [chrs {:keys [prev next chr p3 p5 dir]}]    ; dir in {:plus, :minus}, hash-maps {prev, next}
 ;  (println "register -> chr:" chr "p5:" p5 "\tp3:" p3 "\tnext:" next "  prev:" prev)
-  (let [frag (or (select-fragment chr :p5 p5 dir)
-                 (p :create-fragment (oc/with-tx
-                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir})))))
-        chr (select-chromosome chr)
-        [l5 l3] (if (= dir :plus) [:p5frags :p3frags] [:mp5frags :mp3frags])]
+  (let [frag (or (select-fragment chrs chr :p5 p5 dir)
+                 (oc/with-tx
+                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir}))))
+        chr (select-chromosome chrs chr)]
+;        [l5 l3] (if (= dir :plus) [:p5frags :p3frags] [:mp5frags :mp3frags])]
     (if next
-      (if-let [nfrag (select-fragment (:chr next) :p5 (:p5 next) (:dir next))]
+      (if-let [nfrag (select-fragment chrs (:chr next) :p5 (:p5 next) (:dir next))]
         (link-frags frag nfrag)))
     (if prev
-      (if-let [pfrag (select-fragment (:chr prev) :p3 (:p3 prev) (:dir prev))]
+      (if-let [pfrag (select-fragment chrs (:chr prev) :p3 (:p3 prev) (:dir prev))]
         (link-frags pfrag frag :count)))
-    (link-with-chr frag l5 p5 chr)
-    (link-with-chr frag l3 p3 chr)
+;    (link-with-chr frag l5 p5 (:id chr))
+;    (link-with-chr frag l3 p3 (:id chr))
     (assoc frag :next next :prev prev)))
 ; clj-orient bug: can't create line-break after call to :#rid
 
@@ -266,15 +303,15 @@
                                                           :data-parser identity
                                                           :add-all #(identity %)})
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
-    (is (nil? (select-chromosome "1")))
-    (is (map? (add-chromosome "1" 4324)))
-    (is (map? (select-chromosome "1")))
-    (is (nil? (select-chromosome "error")))
-    (let [f1 (register-fragment {:chr "1" :p5 1 :p3 11 :dir :plus :next {:chr "1" :p5 17 :dir :plus}})
-          f2 (register-fragment {:chr "1" :p5 17 :p3 25 :dir :plus :prev {:chr "1" :p3 11 :dir :plus}})]
+    (is (nil? (select-chromosome chromosomes "1")))
+;    (is (map? (add-chromosome "1" 4324)))
+    (is (map? (select-chromosome chromosomes "1")))
+    (is (nil? (select-chromosome chromosomes "error")))
+    (let [f1 (register-fragment chromosomes {:chr "1" :p5 1 :p3 11 :dir :plus :next {:chr "1" :p5 17 :dir :plus}})
+          f2 (register-fragment chromosomes {:chr "1" :p5 17 :p3 25 :dir :plus :prev {:chr "1" :p3 11 :dir :plus}})]
       (is (= 1 (count (og/get-links f1 f2)))))
-    (is (nil? (select-fragment "1" :p5 17 :minus)))
-    (is (map? (select-fragment "1" :p5 17 :plus)))))
+    (is (nil? (select-fragment chromosomes "1" :p5 17 :minus)))
+    (is (map? (select-fragment chromosomes "1" :p5 17 :plus)))))
 
 
 (deftest sam-test
@@ -287,7 +324,7 @@
                   :data-parser   pressspan.saminput/make-frag
                   :add-all (comp remember-circular remember-multistrand register-fragment)})
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
-    (is (= 5  (count (oq/native-query :chromosome {}))))
+;    (is (= 5  (count (oq/native-query :chromosome {}))))
     (is (= 14 (count (oq/native-query :fragment {}))))
     (is (< 0 (og/count-edges)))
     (is (= 3 (count (get-subgraph (first @multis))))))
