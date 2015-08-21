@@ -35,6 +35,7 @@
   ; Side-effects!
   (def circulars (ref #{}))
   (def multis (ref #{}))
+  (def chromosomes (ref {}))
 
   
   (og/create-vertex-type! :genome)
@@ -108,6 +109,21 @@
         (process-data file (:data-parser fns) (or (:add-all fns) register-fragment) (:head? fns))))))
 
 
+;(defnp add-chromosome
+;  "creates an empty chromosome with lookup-id [id] and a length of [len] basepairs,
+;   registers and links it with the genome graph"
+;  [id len]
+;  (let [chr-data {:id id
+;                  :len len
+;                  :p5frags (im/int-map)   ; 5' +strand links
+;                  :p3frags (im/int-map)   ; 3' +strand links
+;                  :mp5frags (im/int-map)  ; 5' -strand links
+;                  :mp3frags (im/int-map)} ; 3' -strand links
+;        chr (oc/with-tx (oc/save! (og/vertex :chromosome chr-data)))
+;        root (og/get-root :genome)]
+;    (oc/with-tx
+;      (oc/save! (assoc root :chrs (assoc (:chrs root) id (:#rid chr)))))))
+
 (defnp add-chromosome
   "creates an empty chromosome with lookup-id [id] and a length of [len] basepairs,
    registers and links it with the genome graph"
@@ -117,22 +133,26 @@
                   :p5frags (im/int-map)   ; 5' +strand links
                   :p3frags (im/int-map)   ; 3' +strand links
                   :mp5frags (im/int-map)  ; 5' -strand links
-                  :mp3frags (im/int-map)} ; 3' -strand links
-        chr (oc/with-tx (oc/save! (og/vertex :chromosome chr-data)))
-        root (og/get-root :genome)]
-    (oc/with-tx
-      (oc/save! (assoc root :chrs (assoc (:chrs root) id (:#rid chr)))))))
+                  :mp3frags (im/int-map)}] ; 3' -strand links
+    (dosync
+     (commute chromosomes into {id chr-data}))))
 
-    
+
+;(defnp select-chromosome
+;  "selects a chromosome by [id]-string from the database and returns it"
+;  [id]
+;  (if id
+;    (try
+;      (oc/load (get (:chrs (og/get-root :genome)) id))            ; throws if no such chromosome
+;      (catch Exception e
+;        (println "select-chromosome - No such chromosome:" id)
+;        nil))))
+
+
 (defnp select-chromosome
-  "selects a chromosome by [id]-string from the database and returns it"
   [id]
   (if id
-    (try
-      (oc/load (get (:chrs (og/get-root :genome)) id))            ; throws if no such chromosome
-      (catch Exception e
-        (println "select-chromosome - No such chromosome:" id)
-        nil))))
+    (get @chromosomes id)))
 
 
 (defnp link-frags
@@ -153,8 +173,9 @@
 
 (defnp link-with-chr
   [frag link pos chr]
-  (oc/with-tx
-    (oc/save! (update-in chr [link] into {pos (:#rid frag)}))))
+  (prn "link-with-frag\nfrag:" (dissoc frag :next :prev :in :out)
+       "\nlink:" link "pos:" pos "on chromosome" (:id chr))
+  (dosync (commute chromosomes assoc (:id chr) (assoc chr link {pos (:#rid frag)}))))
 
 
 (defnp select-fragment
@@ -166,8 +187,8 @@
   (if-let [chrom (select-chromosome (if (map? chr) (:id chr) chr))] ; select chromosome if neccessary, proceed only if found
     (let [end (if (= strandiness :plus)
                 (if (= dir :p5) :p5frags :p3frags)
-                (if (= dir :p5) :mp5frags :mp3frags))
-          pos (str pos)]
+                (if (= dir :p5) :mp5frags :mp3frags))]
+;          pos (str pos)]
       (if-let [orid (get (end chrom) pos)]
         (oc/load orid)))))
 
@@ -191,7 +212,7 @@
         (link-frags pfrag frag :count)))
     (link-with-chr frag l5 p5 chr)
     (link-with-chr frag l3 p3 chr)
-     (assoc frag :next next :prev prev)))
+    (assoc frag :next next :prev prev)))
 ; clj-orient bug: can't create line-break after call to :#rid
 
 
