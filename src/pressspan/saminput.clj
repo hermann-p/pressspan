@@ -48,7 +48,7 @@
 (defnp cigar-ops [ops freqs]
   (reduce
      (fn [m tuple]
-       (update m (keyword (first tuple)) (fn [k x] (+ (or k 0) (Integer. x))) (last tuple)))
+       (update m (keyword (first tuple)) (fn [k x] (+ (or k 0) (Integer. x))) (second tuple)))
      {}
      (partition 2 (interleave ops freqs))))
 

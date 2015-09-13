@@ -69,14 +69,15 @@
 
 
 (defn exit-after [fun & stat]
-  (try (fun) (catch Exception e)))
-  ;(System/exit (or stat 1)))
+  (try (fun) (catch Exception e))
+  (System/exit (or stat 1)))
 
 
 (defn -main
   [& args]
   (let [{:keys [options arguments summary errors]} (parse-opts args cli-options)]
     (cond         ; check argument validity
+     (not (seq args)) (exit-after ((usage summary) summary 0))
      (:help options) (exit-after ((usage summary) summary 0))
 
      (< 0 (count errors))
@@ -91,14 +92,10 @@
      )
 
     (if-let [funs (get functions (last (clojure.string/split (:in options) #"\.")))]
-      (let [adder (comp
-                   (if (:multistrand options)
-                     pressspan.graph/remember-multistrand
-                     identity)
-                   (if (:circular options)
-                     pressspan.graph/remember-circular
-                     identity)
-                   (:add-all funs))
+      (let [input-funs [(if (:multistrand options) pressspan.graph/remember-multistrand)
+                        (if (:circular options) pressspan.graph/remember-circular)
+                        (:add-all funs)]
+            adder (reduce comp (filter (complement nil?) input-funs))            
             funs (assoc funs :add-all adder)]
 
         (println "Analysing file...")
@@ -114,6 +111,6 @@
 (if false
   (profile :info
            :Arithmetic
-           (dotimes [n 3]
-             (p :pressspan (-main "-i" "test/data/large.sam"))
+           (dotimes [n 1]
+             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c"))
              (clj-orient.core/delete-db! (clj-orient.graph/open-graph-db! "memory:data" "admin" "admin")))))

@@ -3,19 +3,12 @@
             [clj-orient.graph :as og]
             [clj-orient.query :as oq]
             [clojure.data.int-map :as im]))
-;  (:require
-;    [taoensso.timbre :as timbre
-;      :refer (log  trace  debug  info  warn  error  fatal  report
-;              logf tracef debugf infof warnf errorf fatalf reportf
-;              spy get-env log-env)]
-;    [taoensso.timbre.profiling :as profiling
-;      :refer (pspy pspy* profile defnp p p*)])) ; hm... seems to cast int-map to map?
 
 (use '[clojure.test]
      '[taoensso.timbre.profiling])
 
-(declare graph-test-fn
-         select-fragment
+
+(declare select-fragment
          add-chromosome
          register-fragment)
 
@@ -23,9 +16,9 @@
 (def db-name "memory:test")
 (def db-user "admin")
 (def db-pass "admin")
-(def chromosomes {})
 
-(def rid #(:#rid %))
+
+(def rid #(:#rid %)) ; workaround for linebreak-bug of :#rid
 
 
 (defn init-database!
@@ -38,8 +31,6 @@
   ; Side-effects!
   (def circulars (ref #{}))
   (def multis (ref #{}))
-  (def chromosomes {})
-
   
   (og/create-vertex-type! :genome)
     (og/create-vertex-type! :chromosome)
@@ -100,13 +91,10 @@
                 (for [line (drop-while head? lines)]
                   (get-data line)))]
     (persistent! all-chrs)))
-  
-;  (doseq [line (drop-while head? lines)]
-;    (add-all (get-data line))))
 
 
 (defn create-genome
-  "Cennects to an OrientDB database and calls functions to read in a genome file
+  "Connects to an OrientDB database and calls functions to read in a genome file
   Input:
   [file-name] string path to datafile
   [fns]       map of processing functions. Needs
@@ -126,10 +114,7 @@
   (println "Requested OrientDB database:" db-name)
   (let [db-type (first (clojure.string/split db-name #":"))]
     (println "OrientDB type:" db-type)
-    (if ((some-fn true?)
-         (= db-type "memory")
-         (= db-type "local")
-         (= db-type "plocal"))
+    (if (contains? #{"memory" "local" "plocal"}  db-type)
       (do
         (println "Creating fresh database...")
         (oc/create-db! gname))
@@ -149,49 +134,9 @@
                           (:head? fns)))))))
 
 
-;(defnp add-chromosome
-;  "creates an empty chromosome with lookup-id [id] and a length of [len] basepairs,
-;   registers and links it with the genome graph"
-;  [id len]
-;  (let [chr-data {:id id
-;                  :len len
-;                  :p5frags (im/int-map)   ; 5' +strand links
-;                  :p3frags (im/int-map)   ; 3' +strand links
-;                  :mp5frags (im/int-map)  ; 5' -strand links
-;                  :mp3frags (im/int-map)} ; 3' -strand links
-;        chr (oc/with-tx (oc/save! (og/vertex :chromosome chr-data)))
-;        root (og/get-root :genome)]
-;    (oc/with-tx
-;      (oc/save! (assoc root :chrs (assoc (:chrs root) id (:#rid chr)))))))
-
-(defnp add-chromosome
-  "creates an empty chromosome with lookup-id [id] and a length of [len] basepairs,
-   registers and links it with the genome graph"
-  [id len]
-  (let [chr-data {:id id
-                  :len len
-                  :p5frags (im/int-map)   ; 5' +strand links
-                  :p3frags (im/int-map)   ; 3' +strand links
-                  :mp5frags (im/int-map)  ; 5' -strand links
-                  :mp3frags (im/int-map)}] ; 3' -strand links
-    (dosync (commute chromosomes into {id chr-data}))))
-
-
-;(defnp select-chromosome
-;  "selects a chromosome by [id]-string from the database and returns it"
-;  [id]
-;  (if id
-;    (try
-;      (oc/load (get (:chrs (og/get-root :genome)) id))            ; throws if no such chromosome
-;      (catch Exception e
-;        (println "select-chromosome - No such chromosome:" id)
-;        nil))))
-
-
 (defnp select-chromosome
   [chr id]
-  (if id
-    (get chr id)))
+  (if id (get chr id)))
 
 
 (defnp link-frags
@@ -199,17 +144,9 @@
   [count] increment link counter if non-nil
   returns the link"
   [up-el dn-el & count]
-;  (println "Linkin" (dissoc up-el :in :out) "=>" (dissoc dn-el :in :out))
-  (oc/with-tx
-    (if-let [link (first (og/get-links up-el dn-el))]
-      (if count (oc/save! (update link :depth inc)))
-      (oc/save! (og/link! up-el :splice {:depth 1} dn-el)))))
-
-
-(defnp link-with-chr
-  [frag link pos chr-id]
-  (dosync (alter chromosomes assoc chr-id (assoc (select-chromosome chr-id)
-                                              link {pos (:#rid frag)}))))
+  (if-let [link (first (og/get-links up-el dn-el))]
+    (if count (oc/save! (update link :depth inc)))
+    (oc/save! (og/link! up-el :splice {:depth 1} dn-el))))
 
 
 (defnp select-fragment
@@ -222,9 +159,8 @@
     (let [end (if (= strandiness :plus)
                 (if (= dir :p5) :p5frags :p3frags)
                 (if (= dir :p5) :mp5frags :mp3frags))]
-;          pos (str pos)]
       (if-let [orid (get (end chrom) pos)]
-        (try
+        (try                                                             ; catch exception for REPL tests
           (oc/load orid)
           (catch Exception e
             orid))))))
@@ -235,46 +171,41 @@
   performs a check before creation to avoid duplicates
   [data] hash-map of fragment properties"
   [chrs {:keys [prev next chr p3 p5 dir]}]    ; dir in {:plus, :minus}, hash-maps {prev, next}
-;  (println "register -> chr:" chr "p5:" p5 "\tp3:" p3 "\tnext:" next "  prev:" prev)
-  (let [frag (or (select-fragment chrs chr :p5 p5 dir)
-                 (oc/with-tx
-                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir}))))
-        chr (select-chromosome chrs chr)]
-;        [l5 l3] (if (= dir :plus) [:p5frags :p3frags] [:mp5frags :mp3frags])]
-    (if next
-      (if-let [nfrag (select-fragment chrs (:chr next) :p5 (:p5 next) (:dir next))]
-        (link-frags frag nfrag)))
-    (if prev
-      (if-let [pfrag (select-fragment chrs (:chr prev) :p3 (:p3 prev) (:dir prev))]
-        (link-frags pfrag frag :count)))
-;    (link-with-chr frag l5 p5 (:id chr))
-;    (link-with-chr frag l3 p3 (:id chr))
-    (assoc frag :next next :prev prev)))
-; clj-orient bug: can't create line-break after call to :#rid
+  (oc/with-tx
+    (let [frag (or (select-fragment chrs chr :p5 p5 dir)
+                   (oc/save! (og/vertex :fragment {:p3 p3, :p5 p5, :chr chr :dir dir})))
+          chr (select-chromosome chrs chr)]
+      (if next
+        (if-let [nfrag (select-fragment chrs (:chr next) :p5 (:p5 next) (:dir next))]
+          (link-frags frag nfrag)))
+      (if prev
+        (if-let [pfrag (select-fragment chrs (:chr prev) :p3 (:p3 prev) (:dir prev))]
+          (link-frags pfrag frag :count)))
+    (assoc frag :next next :prev prev))))      ; return document and additional info, for composition with filters
 
 
-(defn remember-multistrand
+(defnp remember-multistrand
   [frag]
   (if-not (= (:chr frag) (:chr (:next frag))) ; multistrand if elements on different strands
     (dosync
-     (alter multis conj (:#rid frag)))) frag)
+     (commute multis conj (:#rid frag)))) frag)
 
 
-(defn remember-circular
+(defnp remember-circular
   [frag]
   (if-let [next-p5 (:p5 (:next frag))]
-    (let [is-upstream (if (= :plus (:dir frag)) < >)]
+    (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
       (if ((every-pred true?)
-               (= (:chr frag) (:chr (:next frag)))    ; circular if on same strand and
-               (is-upstream next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
+               (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand and
+               (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync
-         (alter circulars conj (:#rid frag)))))) frag)
+         (commute circulars conj (:#rid frag)))))) frag)
 
 
 ;; Traversing the database requieres casting to and from record-ids
-;; as different fetches of the same element may or may not be unique
+;; as different db fetches of the same element may or may not be unique
 
-(defn get-neighbours-
+(defn- get-neighbours
   "Helper to traverse a graph from the database."
   [el]
   (let [n-coll (for [edge (og/get-edges (oc/load el) :both :splice)]
@@ -288,33 +219,13 @@
   [start]
   (let [walk
         (fn walk [known this]
-          (if-let [next-el (first (clojure.set/difference (get-neighbours- this) known))]
+          (if-let [next-el (first (clojure.set/difference (get-neighbours this) known))]
             (lazy-seq
              (cons this
                    (walk (conj known this) next-el)))))] (walk #{} start)))
 
 
-(deftest structuretest
-  (if (oc/db-exists? "memory:test")
-    (do (println "\nDeleting database...")
-        (oc/delete-db! (og/open-graph-db! "memory:test" "admin" "admin"))))
-  (create-genome "memory:test" "/home/hermann/5_out.sam" {:head? #(complement (nil? %))
-                                                          :header-parser #(do (identity %) {:id "2" :len 5000})
-                                                          :data-parser identity
-                                                          :add-all #(identity %)})
-  (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
-    (is (nil? (select-chromosome chromosomes "1")))
-;    (is (map? (add-chromosome "1" 4324)))
-    (is (map? (select-chromosome chromosomes "1")))
-    (is (nil? (select-chromosome chromosomes "error")))
-    (let [f1 (register-fragment chromosomes {:chr "1" :p5 1 :p3 11 :dir :plus :next {:chr "1" :p5 17 :dir :plus}})
-          f2 (register-fragment chromosomes {:chr "1" :p5 17 :p3 25 :dir :plus :prev {:chr "1" :p3 11 :dir :plus}})]
-      (is (= 1 (count (og/get-links f1 f2)))))
-    (is (nil? (select-fragment chromosomes "1" :p5 17 :minus)))
-    (is (map? (select-fragment chromosomes "1" :p5 17 :plus)))))
-
-
-(deftest sam-test
+(deftest sam-test                ; run tests on manually created mapping file
   (if (oc/db-exists? "memory:test")
     (do (println "\nDeleting database...")
         (oc/delete-db! (og/open-graph-db! "memory:test" "admin" "admin"))))
@@ -322,17 +233,17 @@
                  {:head?         pressspan.saminput/header-line?
                   :header-parser pressspan.saminput/parse-header-line
                   :data-parser   pressspan.saminput/make-frag
-                  :add-all (comp remember-circular remember-multistrand register-fragment)})
+                  :add-all (comp remember-circular remember-multistrand register-fragment)}) ; test realignment, multistrand and circular detection
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
-;    (is (= 5  (count (oq/native-query :chromosome {}))))
-    (is (= 14 (count (oq/native-query :fragment {}))))
-    (is (< 0 (og/count-edges)))
-    (is (= 3 (count (get-subgraph (first @multis))))))
-  (is (= 12  (count @multis))))
+    (is (= 14 (count (oq/native-query :fragment {})))) ; 14 unique fragments, 6 duplicates
+    (is (< 0 (og/count-edges)))                        ; links should appear
+    (is (= 3 (count (get-subgraph (first @multis)))))  ; first multisplit consists of 3 elements
+    (println (clojure.string/join \newline (get-subgraph (first @multis))))) ; look at the links
+  (is (= 12  (count @multis))))                        ; there are 12 multistrand junctions
 
 ; (run-tests)
 
-(if false
+(if false ; code to print all created fragments ordered by chromosome
   (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
     (for [frag (sort #(compare (:chr %1) (:chr %2)) (oq/native-query :fragment {}))]
       (println (format "%s:%d-%d" (:chr frag) (:p5 frag) (:p3 frag))))))
