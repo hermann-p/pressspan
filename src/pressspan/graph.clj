@@ -105,7 +105,7 @@
   [root frag]
   (if-not (= (:chr frag) (:chr (:next frag))) ; multistrand if elements on different strands
     (dosync
-     (commute update-in root [multis] conj (:id frag)))) 
+     (commute update-in root [:multis] conj (:id frag)))) 
   frag)
 
 
@@ -184,13 +184,13 @@
     ;(println (clojure.string/join \newline @genome))))
 
 (deftest samtest
-  (let [filename "test/data/5_out.sam"
+  (let [filename "test/data/large.sam"
         funs {:head? pressspan.saminput/header-line?
               :header-parser pressspan.saminput/parse-header-line
               :data-parser pressspan.saminput/make-frag
               :add-all pressspan.graph/register-fragment}
-        genome (create-genome "test/data/5_out.sam" funs)]
+        genome (create-genome filename funs)]
     (is (map? genome))
     (is (= 14 (:nf genome)))
-    (is (= 10 (:nl genome)))
-    (println (clojure.string/join \newline genome))))
+    (is (= 10 (:nl genome)))))
+ ;;   (println (clojure.string/join \newline genome))))
