@@ -38,13 +38,13 @@
 ;    :default 1
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 %) "Must be a positive number"]]
-   ["-D" "--database TYPE:NAME" "OrientDB database to use. Type in [local plocal remote]. Type remote needs running OrientDB server."
-    :default "memory:data"
-    :default-desc "memory"]
-   ["-U" "--user USERNAME" "Username for remote database"
-    :default "admin"]
-   ["-P" "--pass PASSWORD" "Password for remote database"
-    :default "admin"]
+ ;  ["-D" "--database TYPE:NAME" "OrientDB database to use. Type in [local plocal remote]. Type remote needs running OrientDB server."
+ ;   :default "memory:data"
+ ;   :default-desc "memory"]
+ ;  ["-U" "--user USERNAME" "Username for remote database"
+ ;   :default "admin"]
+ ;  ["-P" "--pass PASSWORD" "Password for remote database"
+ ;   :default "admin"]
    ["-h" "--help"]])
 
 (def functions
@@ -95,15 +95,8 @@
       (let [input-funs [(if (:multistrand options) pressspan.graph/remember-multistrand)
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
-            adder (reduce comp (filter (complement nil?) input-funs))            
-            funs (assoc funs :add-all adder)]
-
-        (println "Analysing file...")
-        (time
-        (if (= "remote" (first (clojure.string/split (:database options) #":")))
-          (pressspan.graph/create-genome (:database options) (:in options) funs {:user (:user options)
-                                                                                 :pass (:pass options)})
-          (pressspan.graph/create-genome (:database options) (:in options) funs))))
+            funs (assoc funs :add-all input-funs)]
+        (pressspan.graph/create-genome(:in options) funs))
       (println "No functions known to treat" (last (clojure.string/split (:in options) #"\.")) "format. Why don't you create them?"))
     ))
 
@@ -112,5 +105,4 @@
   (profile :info
            :Arithmetic
            (dotimes [n 1]
-             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c"))
-             (clj-orient.core/delete-db! (clj-orient.graph/open-graph-db! "memory:data" "admin" "admin")))))
+             (p :pressspan (-main "-i" "test/data/large.sam")))))

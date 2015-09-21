@@ -33,7 +33,7 @@
   "maps interesting fields of a tokenized alignment line from a .sam file"
   [tokens]
   (let [[_ flag rname p5 _ cigar _ _ _ _ _] tokens          ; destructure tokens
-        sm-keys (re-seq #"X[XYQPUSTCV]:\w:[0-9A-Za-z]+" (join " " (drop 11 tokens)))]  ; extract segemehl-info by regex
+        sm-keys (re-seq #"X[XYQPUSTCV]:\w:[0-9A-Za-z.]+" (join " " (drop 11 tokens)))]  ; extract segemehl-info by regex
     {:chr rname :p5 (Integer. p5) :flag (Integer. flag) :cigar cigar :segemehl sm-keys})) ; return mapped results
 
 

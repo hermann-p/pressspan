@@ -145,8 +145,11 @@
 
 (defnp parse-data
   [root lines funs];[{:keys [head? data-parser add-all]}]]
-  (doseq [line (drop-while (:head? funs) lines)]
-    ((:add-all funs) root ((:data-parser funs) line))))
+  (let [add-frag (filter identity (:add-all funs))
+        add-frag (mapv #(partial % root) add-frag)
+        add-frag (reduce comp add-frag)]
+    (doseq [line (drop-while (:head? funs) lines)]
+      (add-frag ((:data-parser funs) line)))))
 
 (defn create-genome
   [filename funs]
@@ -184,11 +187,11 @@
     ;(println (clojure.string/join \newline @genome))))
 
 (deftest samtest
-  (let [filename "test/data/large.sam"
+  (let [filename "test/data/5_out.sam"
         funs {:head? pressspan.saminput/header-line?
               :header-parser pressspan.saminput/parse-header-line
               :data-parser pressspan.saminput/make-frag
-              :add-all pressspan.graph/register-fragment}
+              :add-all [register-fragment]}
         genome (create-genome filename funs)]
     (is (map? genome))
     (is (= 14 (:nf genome)))
