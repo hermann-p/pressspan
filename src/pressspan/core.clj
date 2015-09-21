@@ -97,12 +97,14 @@
                         (:add-all funs)]
             funs (assoc funs :add-all input-funs)]
         (pressspan.graph/create-genome(:in options) funs))
-      (println "No functions known to treat" (last (clojure.string/split (:in options) #"\.")) "format. Why don't you create them?"))
+      (println "No functions known to treat" 
+               (last (clojure.string/split (:in options) #"\.")) ; get file extension
+               "format. Why don't you create them?"))
     ))
 
 
 (if false
   (profile :info
            :Arithmetic
-           (dotimes [n 1]
-             (p :pressspan (-main "-i" "test/data/large.sam")))))
+           (dotimes [n 3]
+             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c")))))
