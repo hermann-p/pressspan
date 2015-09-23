@@ -1,5 +1,6 @@
 (ns pressspan.graph
-  (:require [clojure.data.int-map :as im]))
+  (:require [clojure.data.int-map :as im])
+  (:use [clojure.set :only [difference union]]))
 
 
 (use '[clojure.test]
@@ -105,7 +106,7 @@
   [root frag]
   (if-not (= (:chr frag) (:chr (:next frag))) ; multistrand if elements on different strands
     (dosync
-     (commute update-in root [:multis] conj (:id frag)))) 
+     (commute root update-in [:multis] conj (:id frag)))) 
   frag)
 
 
@@ -117,7 +118,7 @@
                (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand and
                (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync
-          (commute update-in root [:circulars] conj (:id frag))))))
+          (commute root update-in [:circulars] conj (:id frag))))))
   frag)
 
 
@@ -167,6 +168,46 @@
     @genome))
 
 
+;;; Postprocessing functions working on maps, NOT ref's
+
+
+(defn- get-both [graph lnk-id]
+  (let [el (get-in graph [:links lnk-id])]
+    ((juxt :up :down) el)))
+
+(defn- get-adjacent [graph el-id]
+  (let [el (get-in graph [:frags el-id])
+        link-ids (apply concat [(:up el) (:down el)])
+        links (map (partial get-both graph) link-ids)
+        links (set (apply concat links))]
+    (difference links #{el-id})))
+
+(defn get-subgraph [graph start]
+  (let [walk
+        (fn walk [known unvisited this]
+          (let [unvisited (union (get-adjacent graph this) unvisited)
+                unvisited (difference unvisited known)
+                unvisited (difference unvisited #{this})]
+            (if-let [next-el (first (difference unvisited known))]
+              (lazy-seq
+                (cons this
+                      (walk (conj known this) (difference unvisited #{this}) next-el)))
+              (lazy-seq [this]))))]
+    (walk #{} #{} start)))
+
+
+(defn all-subgraphs [graph indices]
+  (let [walk
+        (fn walk [unvisited]
+          (if-let [start (first unvisited)]
+            (let [sg (get-subgraph graph start)]
+              (if (seq sg)
+                (lazy-seq
+                  (cons sg
+                        (walk (difference unvisited sg))))))))]
+    (walk indices)))
+            
+          
 (deftest structuretest
   (let [A {:chr "1" :p5 1 :p3 177 :dir :plus}
         B {:chr "2" :p5 199 :p3 521 :dir :plus}
@@ -184,16 +225,17 @@
     (is (nil? (get-el genome (assoc A :chr "negative-test"))))
     (link-frags genome (:id (get-el genome A)) (:id (get-el genome B)))
     (link-frags genome (:id (get-el genome A)) (:id (get-el genome C)))))
-    ;(println (clojure.string/join \newline @genome))))
 
 (deftest samtest
   (let [filename "test/data/5_out.sam"
         funs {:head? pressspan.saminput/header-line?
               :header-parser pressspan.saminput/parse-header-line
               :data-parser pressspan.saminput/make-frag
-              :add-all [register-fragment]}
+              :add-all [remember-multistrand remember-circular register-fragment]}
         genome (create-genome filename funs)]
     (is (map? genome))
     (is (= 14 (:nf genome)))
-    (is (= 10 (:nl genome)))))
+    (is (= 10 (:nl genome)))
+    (is (= #{0 1 2 3} (set (doall (get-subgraph genome (first (:multis genome)))))))
+    (is (= 5 (count (all-subgraphs genome (:multis genome)))))))
  ;;   (println (clojure.string/join \newline genome))))

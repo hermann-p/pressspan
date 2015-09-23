@@ -75,6 +75,10 @@
 
 (defn -main
   [& args]
+  (if-not [seq args] 
+    (do
+      (println (clojure.string/join \newline cli-options))
+      (System/exit 1)))
   (let [{:keys [options arguments summary errors]} (parse-opts args cli-options)]
     (cond         ; check argument validity
      (not (seq args)) (exit-after ((usage summary) summary 0))
