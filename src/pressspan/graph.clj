@@ -238,4 +238,3 @@
     (is (= 10 (:nl genome)))
     (is (= #{0 1 2 3} (set (doall (get-subgraph genome (first (:multis genome)))))))
     (is (= 5 (count (all-subgraphs genome (:multis genome)))))))
- ;;   (println (clojure.string/join \newline genome))))
