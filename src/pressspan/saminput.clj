@@ -67,7 +67,7 @@
 (defnp make-frag
   "creates a read fragment node from a string of segemehl-created .sam data"
   [data-string]
-  (let [tokens (split data-string #"[\t ]+")
+  (let [tokens (split data-string #"\t+")
         data (extract-data tokens)
 ;        len (un-cigar (:cigar data))
         sm (extract-split-info (:segemehl data)) ; segemehl custom split data
@@ -101,7 +101,7 @@
 
 (deftest sam-processing-test
   (let [hdr-line "@SQ\tSN:1\tLN:3000"
-        dta-line "Read1   0       1       722     255     40M     *       0       0       ACATCGAATCCACTACCAGTGAAACTGTGCCACAGCCACA        *       NM:i:0  MD:Z:40 NH:i:1  XI:i:0  XL:i:4  XA:Z:Q  XX:i:41 XY:i:80 XQ:i:1  XP:Z:1  XU:i:40 XS:i:64 XC:Z:2  XV:i:17 XT:i:32
+        dta-line "Read1\t0\t1\t722\t255\t40M\t*\t0\t0\tACATCGAATCCACTACCAGTGAAACTGTGCCACAGCCACA\t*\tNM:i:0\tMD:Z:40\tNH:i:1\tXI:i:0\tXL:i:4\tXA:Z:\tQXX:i:41\tXY:i:80\tXQ:i:1\tXP:Z:1\tXU:i:40\tXS:i:64\tXC:Z:2\tXV:i:17\tXT:i:32
 "]
     (is (= 10 (un-cigar "10M") (un-cigar "10M1I1D") (un-cigar "10D5M5I")))
     (is 33 (un-cigar "10M4D15M3I7M"))
