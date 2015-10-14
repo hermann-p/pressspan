@@ -87,7 +87,7 @@
 				put-el
 				(fn [el]
           (cons 
-            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25"
+            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25,"
                  "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
                  "color=\"" (chr-color (Integer. (:chr el))) "\"];\n")
             (for [link (:up el)] (str "  " (:id el) "->" (:up link) " [label=\"" (:depth link) "\"];\n"))))
@@ -99,6 +99,17 @@
          "  rankdir=\"LR\";" \newline
 	       (clojure.string/join (doall (concat (trampoline walk g))))
 	       "}")))
+
+
+(defn graph->log [root graph id-string]
+  (let [nodes (map #(get-in root [:frags %]) graph)]
+    (format "%s\t|%s|\t%s\n"
+    	id-string 
+	    (clojure.string/join ","
+	      (for [el nodes] 
+	        (str (if (= :minus (:dir el)) "-") (:chr el) ":" (:p5 el) "-" (:p3 el))))
+      (clojure.string/join ","
+	      (sort (set (map :chr nodes)))))))
 
 
 (deftest graph-test
@@ -113,4 +124,5 @@
     (is (map? (assign-layers genome subgraph)))
     (is (map? (fix-links (get-in genome [:frags (first subgraph)]) genome)))
     (is (= 4 (count (load-and-fix subgraph genome))))
-    (println (graph->dot genome subgraph "testgraph"))))
+    (println (graph->dot genome subgraph "testgraph"))
+    (println (graph->log genome subgraph "testgraph"))))
