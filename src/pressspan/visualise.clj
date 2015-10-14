@@ -40,13 +40,65 @@
                   layered-graph))]
     (let [vertices (mapv #(get-in root [:frags %]) graph)
           vert-map (zipmap graph vertices)]
-      (println "vert-map:")
       (trampoline find-here (set graph) #{} #{} vert-map {} 0 ))))
 
 
 (defn insert-dummies [graph]
   (let [did -1]
     ))
+
+
+(defn- fix-links
+	"Changes el->link-id->link->el-id structure to el->el-id"
+	[el root]
+	(let [up-links (map #(get-in root [:links %]) (:up el))
+;			  up-ids (map :up up-links)
+			  dn-links (map #(get-in root [:links %]) (:dn el))]
+	;		  dn-ids (map :dn dn-links)]
+		(-> el
+	  	(assoc :up up-links)
+	  	(assoc :down dn-links))))
+
+
+(defn- load-and-fix
+  "Transforms a list of element-ids to a map of element-id -> element with 
+  link-ids changed to linked-element-ids"
+  [graph root]
+  (let [graph (map #(get-in root [:frags %]) graph)]
+  (zipmap (map :id graph) (map #(fix-links % root) graph))))
+
+
+(defn- hex [n]
+  {:pre [(integer? n) (>= n 0) (<= n 255)]}
+  (if (> n 16)
+    (format "%x" n)
+    (format "0%x" n)))
+
+(defn- chr-color [n]
+  (nth (cycle (for [r (map (partial * 85) (range 4))
+             g [255 0 128]
+             b (map #(- 255 (* 85 %)) (range 4))]
+         (str "#" (hex r) (hex g) (hex b))))
+       (- (* 3 n) 1)))
+
+
+(defn graph->dot [root graph id-string]
+	(let [g (vals (load-and-fix graph root))
+				put-el
+				(fn [el]
+          (cons 
+            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25"
+                 "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
+                 "color=\"" (chr-color (Integer. (:chr el))) "\"];\n")
+            (for [link (:up el)] (str "  " (:id el) "->" (:up link) " [label=\"" (:depth link) "\"];\n"))))
+	      walk
+	      (fn walk [els]
+	      	(if (seq els)
+	         (conj (walk (rest els)) (clojure.string/join (put-el (first els))))))]
+	  (str "digraph " id-string " {" \newline 
+         "  rankdir=\"LR\";" \newline
+	       (clojure.string/join (doall (concat (trampoline walk g))))
+	       "}")))
 
 
 (deftest graph-test
@@ -58,4 +110,7 @@
         genome (pressspan.graph/create-genome filename funs)
         multi (first (:multis genome))
         subgraph (pressspan.graph/get-subgraph genome multi)]
-    (is (map? (assign-layers genome subgraph)))))
+    (is (map? (assign-layers genome subgraph)))
+    (is (map? (fix-links (get-in genome [:frags (first subgraph)]) genome)))
+    (is (= 4 (count (load-and-fix subgraph genome))))
+    (println (graph->dot genome subgraph "testgraph"))))
