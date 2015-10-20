@@ -182,19 +182,36 @@
       (difference links #{el-id}))))
 
 
+(defn- prune [root node-id min-depth]
+  (let [node (get-in root [:frags node-id])
+        up-links (map #(get-in root [:links %]) (:up node))
+        dn-links (map #(get-in root [:links %]) (:down node))
+        truncate (fn [links] (set (filter #(<= min-depth (:depth %)) links)))]
+ ;   (println "Node:" node "===> "
+    (->
+      node
+      (assoc :up (truncate up-links))
+      (assoc :down (truncate dn-links)))
+    (->
+      node
+      (assoc :up (truncate up-links))
+      (assoc :down (truncate dn-links))))))
+
+
 (defn get-subgraph 
   ([graph start] (get-subgraph graph start 1))
-  ([graph start trunc]
+  ([graph start min-depth]
     (let [walk
         (fn walk [known unvisited this]
-          (let [unvisited (union (get-adjacent graph this trunc) unvisited)
+;          (println "walk\nknown:" known "unvisited:" unvisited "this:" this)
+          (let [unvisited (union (get-adjacent graph this min-depth) unvisited)
                 unvisited (difference unvisited known)
                 unvisited (difference unvisited #{this})]
             (if-let [next-el (first (difference unvisited known))]
               (lazy-seq
-                (cons this
+                (cons (prune graph this min-depth)
                       (walk (conj known this) (difference unvisited #{this}) next-el)))
-              (lazy-seq [this]))))]
+              (lazy-seq [(prune graph this min-depth)]))))]
       (walk #{} #{} start))))
 
 
@@ -208,7 +225,7 @@
               (if (seq sg)
                 (lazy-seq
                   (cons sg
-                        (walk (difference unvisited sg))))))))]
+                        (walk (difference unvisited (set (map :id sg))))))))))]
       (walk indices))))
             
           
@@ -240,5 +257,7 @@
     (is (map? genome))
     (is (= 14 (:nf genome)))
     (is (= 10 (:nl genome)))
-    (is (= #{0 1 2 3} (set (doall (get-subgraph genome (first (:multis genome)))))))
+    (println (clojure.string/join \newline (get-subgraph genome (first (:multis genome)) 1)))
+ ;   (is (= #{0 1 2 3} (set (doall (get-subgraph genome (first (:multis genome)))))))
+    (is (= 4 (count (get-subgraph genome (first (:multis genome))))))
     (is (= 5 (count (all-subgraphs genome (:multis genome)))))))
