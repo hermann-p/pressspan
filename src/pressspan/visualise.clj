@@ -82,25 +82,6 @@
        (- (* 3 n) 1)))
 
 
-(defn graph->dot [root graph id-string]
-	(let [g (vals (load-and-fix graph root))
-				put-el
-				(fn [el]
-          (cons 
-            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25,"
-                 "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
-                 "color=\"" (chr-color (Integer. (:chr el))) "\"];\n")
-            (for [link (:up el)] (str "  " (:id el) "->" (:up link) " [label=\"" (:depth link) "\"];\n"))))
-	      walk
-	      (fn walk [els]
-	      	(if (seq els)
-	         (conj (walk (rest els)) (clojure.string/join (put-el (first els))))))]
-	  (str "digraph " id-string " {" \newline 
-         "  rankdir=\"LR\";" \newline
-	       (clojure.string/join (doall (concat (trampoline walk g))))
-	       "}")))
-
-
 (defn graph->log [root graph id-string]
   (let [nodes (map #(get-in root [:frags %]) graph)]
     (format "%s\t|%s|\t%s\n"
@@ -112,10 +93,33 @@
 	      (sort (set (map :chr nodes)))))))
 
 
-(defn write-files [root type basedir]
-  (let [graphs (pressspan.graph/all-subgraphs root (type root))
+(defn graph->dot [root graph id-string]
+	(let [g (vals (load-and-fix graph root))
+				put-el
+				(fn [el]
+          (cons 
+            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25,"
+                 "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
+                 "color=\"" (chr-color (Integer. (:chr el))) "\"];\n")
+            (for [link (:up el)]
+               (str "  " (:id el) "->" (:up link) " [label=\"" (:depth link) "\"];\n"))))
+	      walk
+	      (fn walk [els]
+	      	(if (seq els)
+	         (conj (walk (rest els)) (clojure.string/join (put-el (first els))))))]
+	  (str "digraph " id-string " {" \newline 
+         "  rankdir=\"LR\";" \newline
+	       (clojure.string/join (doall (concat (trampoline walk g))))
+	       "}")))
+
+
+(defn write-files
+  ([root type basedir] (write-files root type basedir 1))
+  ([root type basedir min-depth]
+  ;; select those graphs which have more than one node (by truncate function)
+  (let [graphs (filter #(< 1 (count %))(pressspan.graph/all-subgraphs root (type root) min-depth))
   		  typestr (name type)]
-    (println "Writing" (count graphs) typestr "graph files")
+    (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))
     (doall
       (map-indexed
@@ -123,8 +127,7 @@
             (str basedir "/" typestr "/" typestr "_" %1 ".dot")
             (graph->dot root %2 (str typestr "_" %1)))
         graphs)))
-  root)
-                    
+  root))
 
 
 (deftest graph-test
@@ -139,6 +142,6 @@
     (is (map? (assign-layers genome subgraph)))
     (is (map? (fix-links (get-in genome [:frags (first subgraph)]) genome)))
     (is (= 4 (count (load-and-fix subgraph genome))))
-    (write-files genome :multis "test/output")
+    (write-files genome :multis "test/output" 2)
     (println (graph->dot genome subgraph "testgraph"))
     (println (graph->log genome subgraph "testgraph"))))

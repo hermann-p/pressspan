@@ -59,13 +59,6 @@
         new-el)))
 
 
-;(defn- fraginfo
-;  [f]
-;  ((juxt :chr :p5 :p3 :dir) f))
-;(defn- same-frag?
-;  [A B]
-;  (zero? (compare (fraginfo A) (fraginfo B))))
-
 (defn- is-link? [root up-id dn-id link-id]
   (let [link (get-in @root [:links link-id])]
     (and (= (:down link) dn-id)
@@ -168,24 +161,33 @@
     @genome))
 
 
-;;; Postprocessing functions working on maps, NOT ref's
+;;;#############################################################################
+;;; Postprocessing functions work on maps, NOT ref's
+;;;#############################################################################
 
-
-(defn- get-both [graph lnk-id]
+(defn- get-both [graph trunc lnk-id]
   (let [el (get-in graph [:links lnk-id])]
-    ((juxt :up :down) el)))
+ ;   (println "el:" el "minimum link depth:" trunc "pass:" (<= trunc (:depth el)))
+    (if (<= trunc (:depth el))
+      ((juxt :up :down) el))))
 
-(defn- get-adjacent [graph el-id]
-  (let [el (get-in graph [:frags el-id])
+(defn- get-adjacent 
+  ([graph el-id] (get-adjacent graph el-id 1))
+  ([graph el-id trunc]
+;    (println "get-adjacent graph" el-id "trunc:" trunc)
+    (let [el (get-in graph [:frags el-id])
         link-ids (apply concat [(:up el) (:down el)])
-        links (map (partial get-both graph) link-ids)
+        links (map (partial get-both graph trunc) link-ids)
         links (set (apply concat links))]
-    (difference links #{el-id})))
+      (difference links #{el-id}))))
 
-(defn get-subgraph [graph start]
-  (let [walk
+
+(defn get-subgraph 
+  ([graph start] (get-subgraph graph start 1))
+  ([graph start trunc]
+    (let [walk
         (fn walk [known unvisited this]
-          (let [unvisited (union (get-adjacent graph this) unvisited)
+          (let [unvisited (union (get-adjacent graph this trunc) unvisited)
                 unvisited (difference unvisited known)
                 unvisited (difference unvisited #{this})]
             (if-let [next-el (first (difference unvisited known))]
@@ -193,19 +195,21 @@
                 (cons this
                       (walk (conj known this) (difference unvisited #{this}) next-el)))
               (lazy-seq [this]))))]
-    (walk #{} #{} start)))
+      (walk #{} #{} start))))
 
 
-(defn all-subgraphs [graph indices]
-  (let [walk
+(defn all-subgraphs 
+  ([graph indices] (all-subgraphs graph indices 1))
+  ([graph indices trunc]
+    (let [walk
         (fn walk [unvisited]
           (if-let [start (first unvisited)]
-            (let [sg (get-subgraph graph start)]
+            (let [sg (get-subgraph graph start trunc)]
               (if (seq sg)
                 (lazy-seq
                   (cons sg
                         (walk (difference unvisited sg))))))))]
-    (walk indices)))
+      (walk indices))))
             
           
 (deftest structuretest
