@@ -112,6 +112,21 @@
 	      (sort (set (map :chr nodes)))))))
 
 
+(defn write-files [root type basedir]
+  (let [graphs (pressspan.graph/all-subgraphs root (type root))
+  		  typestr (name type)]
+    (println "Writing" (count graphs) typestr "graph files")
+    (pressspan.io/make-dir (str basedir "/" typestr))
+    (doall
+      (map-indexed
+        #(spit
+            (str basedir "/" typestr "/" typestr "_" %1 ".dot")
+            (graph->dot root %2 (str typestr "_" %1)))
+        graphs)))
+  root)
+                    
+
+
 (deftest graph-test
   (let [filename "test/data/5_out.sam"
         funs {:head? pressspan.saminput/header-line?
@@ -124,5 +139,6 @@
     (is (map? (assign-layers genome subgraph)))
     (is (map? (fix-links (get-in genome [:frags (first subgraph)]) genome)))
     (is (= 4 (count (load-and-fix subgraph genome))))
+    (write-files genome :multis "test/output")
     (println (graph->dot genome subgraph "testgraph"))
     (println (graph->log genome subgraph "testgraph"))))

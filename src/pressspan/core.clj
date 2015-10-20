@@ -73,6 +73,8 @@
   (System/exit (or stat 1)))
 
 
+
+  
 (defn -main
   [& args]
   (if-not [seq args] 
@@ -81,7 +83,7 @@
       (System/exit 1)))
   (let [{:keys [options arguments summary errors]} (parse-opts args cli-options)]
     (cond         ; check argument validity
-     (not (seq args)) (exit-after ((usage summary) summary 0))
+;     (not (seq args)) (exit-after ((usage summary) summary 0)) ; duplicate...
      (:help options) (exit-after ((usage summary) summary 0))
 
      (< 0 (count errors))
@@ -100,13 +102,14 @@
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
             funs (assoc funs :add-all input-funs)]
-        (pressspan.graph/create-genome(:in options) funs))
+        (pressspan.graph/create-genome (:in options) funs))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
                "format. Why don't you create them?"))
     ))
 
 
+;; Profiling test code
 (if false
   (profile :info
            :Arithmetic

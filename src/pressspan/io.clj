@@ -17,8 +17,13 @@
         ))))
 
 
+(defn make-dir [path]
+  (if-not (.mkdirs (java.io.File. path))
+    (println "ERROR creating" path))); .mkdirs <-> mkdir -p
+
+
 (deftest io-tests
-  (let [lf (lazy-file "/home/hermann/5_out.sam")]
+  (let [lf (lazy-file "tests/data/5_out.sam")]
     (is (complement (nil? lf)))
     ))
 
