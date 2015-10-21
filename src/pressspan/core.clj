@@ -21,8 +21,8 @@
    ["-i" "--in PATH_TO_FILE" "Input file, required"
     :default-desc "REQUIRED"]
    ["-o" "--out PATH_TO_FILE" "Output file name prefix"
-    :default "presspan"
-    :default-desc "pressspan"]
+    :default "pressspan_analysis"
+    :default-desc "pressspan_analysis"]
    ["-r" "--report PATH_TO_FILE" "Create csv report and write it to FILE"
     :default "report.csv"
     :default-desc "report.csv"]
@@ -35,9 +35,9 @@
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 %) "Must be a positive number"]]
    ["-t" "--trunc DEPTH" "Truncate isoform tree branches linked with read depth lower than DEPTH"
-;    :default 1
+    :default 1
     :parse-fn #(Integer/parseInt %)
-    :validate [#(< 0 %) "Must be a positive number"]]
+    :validate [pos? "Must be a positive number"]]
  ;  ["-D" "--database TYPE:NAME" "OrientDB database to use. Type in [local plocal remote]. Type remote needs running OrientDB server."
  ;   :default "memory:data"
  ;   :default-desc "memory"]
@@ -102,7 +102,11 @@
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
             funs (assoc funs :add-all input-funs)]
-        (pressspan.graph/create-genome (:in options) funs))
+        (->
+          (time (pressspan.graph/create-genome (:in options) funs))
+          (pressspan.visualise/write-files :multis (:out options) (:trunc options))
+          (pressspan.visualise/write-files :circulars (:out options))
+          (pressspan.visualise/write-files :custom (:out options))))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
                "format. Why don't you create them?"))
@@ -113,5 +117,5 @@
 (if false
   (profile :info
            :Arithmetic
-           (dotimes [n 3]
-             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c")))))
+           (dotimes [n 1]
+             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" )))))

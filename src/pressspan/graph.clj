@@ -97,9 +97,10 @@
 
 (defnp remember-multistrand
   [root frag]
-  (if-not (= (:chr frag) (:chr (:next frag))) ; multistrand if elements on different strands
-    (dosync
-     (commute root update-in [:multis] conj (:id frag)))) 
+  (if-let [next (:next frag)]
+    (if-not (= (:chr frag) (:chr next)) ; multistrand if elements on different strands
+      (dosync
+        (commute root update-in [:multis] conj (:id frag)))))
   frag)
 
 
