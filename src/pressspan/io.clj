@@ -1,7 +1,6 @@
-(ns pressspan.io)
-
-(use '[clojure.java.io :only [reader]]
-     '[clojure.test])
+(ns pressspan.io
+  (:use [clojure.java.io :only [reader]]
+        clojure.test))
 
 (defn lazy-file
   [file-name]

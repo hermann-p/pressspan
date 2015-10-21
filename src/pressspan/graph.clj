@@ -1,10 +1,8 @@
 (ns pressspan.graph
   (:require [clojure.data.int-map :as im])
-  (:use [clojure.set :only [difference union]]))
-
-
-(use '[clojure.test]
-     '[taoensso.timbre.profiling])
+  (:use [clojure.set :only [difference union]]
+        clojure.test
+        taoensso.timbre.profiling))
 
 
 (defnp id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
@@ -196,7 +194,7 @@
     (->
       node
       (assoc :up (truncate up-links))
-      (assoc :down (truncate dn-links))))))
+      (assoc :down (truncate dn-links)))))
 
 
 (defn get-subgraph 

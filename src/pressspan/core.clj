@@ -2,18 +2,12 @@
   (:import [java.io BufferedReader])
   (:require pressspan.io
             pressspan.saminput
-            pressspan.graph)
-   (:gen-class))
-
-(require '[clojure.tools.cli :refer [parse-opts]])
-;(require '[taoensso.timbre :as timbre
-;           :refer (log  trace  debug  info  warn  error  fatal  report
-;                        logf tracef debugf infof warnf errorf fatalf reportf
-;                        spy get-env log-env)]
-;         '[taoensso.timbre.profiling :as profiling
-;           :refer (pspy pspy* profile defnp p p*)])
-(use '[taoensso.timbre.profiling])
-
+            pressspan.graph
+            pressspan.visualise
+            [clojure.tools.cli :refer [parse-opts]])
+  (:use taoensso.timbre.profiling)
+  (:gen-class))
+  
 
 (def cli-options
   [["-m" "--multistrand" "Search for multistrand splits"]

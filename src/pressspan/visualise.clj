@@ -1,7 +1,7 @@
 (ns pressspan.visualise
   (:use [clojure.test]
         [clojure.set :only [difference union]])
-  (:require [pressspan.graph :refer [all-subgraphs]]))
+  (:require [pressspan.graph :as graph]))
 
 
 (defn assign-layers
@@ -90,7 +90,7 @@
   ([root type basedir] (write-files root type basedir 1))
   ([root type basedir min-depth]
   ;; select those graphs which have more than one node (by truncate function)
-  (let [graphs (filter #(< 1 (count %))(pressspan.graph/all-subgraphs root (type root) min-depth))
+  (let [graphs (filter #(< 1 (count %))(graph/all-subgraphs root (type root) min-depth))
   		  typestr (name type)]
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))
@@ -112,11 +112,6 @@
         genome (pressspan.graph/create-genome filename funs)
         multi (first (:multis genome))
         subgraph (pressspan.graph/get-subgraph genome multi)]
-;    (is (map? (assign-layers genome subgraph)))
-;    (is (map? (fix-links (get-in genome [:frags (first subgraph)]) genome)))
-    (is (= 4 (count (load-and-fix subgraph genome))))
     (write-files genome :multis "test/output" 1)
     (println (graph->dot genome subgraph "testgraph"))
     (println (graph->log genome subgraph "testgraph"))))
-
-))
