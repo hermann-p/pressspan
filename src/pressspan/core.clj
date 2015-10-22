@@ -5,7 +5,7 @@
             pressspan.graph
             pressspan.visualise
             [clojure.tools.cli :refer [parse-opts]])
-  (:use taoensso.timbre.profiling)
+;  (:use taoensso.timbre.profiling)
   (:gen-class))
   
 
@@ -84,7 +84,7 @@
 
      )
 
-    (if-let [funs (get functions (last (clojure.string/split (:in options) #"\.")))]
+     (if-let [funs (get functions (last (clojure.string/split (:in options) #"\.")))]
       (let [input-funs [(if (:multistrand options) pressspan.graph/remember-multistrand)
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
@@ -102,8 +102,8 @@
 
 
 ;; Profiling test code
-(if false
-  (profile :info
-           :Arithmetic
-           (dotimes [n 1]
-             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" )))))
+;(if false
+;  (profile :info
+;           :Arithmetic
+;           (dotimes [n 1]
+;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" )))))

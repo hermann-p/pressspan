@@ -1,7 +1,8 @@
 (ns pressspan.visualise
   (:use [clojure.test]
         [clojure.set :only [difference union]])
-  (:require [pressspan.graph :as graph]))
+  (:require [pressspan.graph :as graph]
+            [clojure.java.io :refer [writer]]))
 
 
 (defn assign-layers
@@ -88,13 +89,41 @@
 	       "}")))
 
 
+(defn drop-filter
+  "Filter to sort out graphs in which any edge has less than [min-depth] reads"
+  [min-depth]
+  (fn [graph]
+    (let [depths
+          (flatten (for [node graph] (map :depth (:up node))))]
+      (every? #(<= min-depth %) depths))))
+
+
+(defn range-filter
+  "Filter all graphs on chromosome chr, stsrandiness dir, p5 or p3
+   between upper and lower"
+  [chr dir upper lower]
+  ; if lower <= x <= upper, then one of [lower-x, upper-x] is <= 0 and one >= 0
+  (let [between-limits (fn [x] (<= 0 (* (- lower x) (- upper x))))]
+    (fn [graph]
+      (let [candidates (filter #(= chr (:chr %)) graph)
+            candidates (filter #(= dir (:dir %)) candidates)]
+        	(if (empty? candidates) false
+        	  (let [matches 
+        	  ; test nodes if the read overlaps the boundaries partially or completely
+        	        (map #(some-fn (between-limits (:p5 %))
+          	                     (between-limits (:p3 %))
+            	                   (and (< lower (:p3 %)) (> upper (:p5 %))))
+                       candidates)]
+              (not (every? false? matches))))))))
+        
+
 (defn write-files
   ([root type basedir] (write-files root type basedir 1))
-  ([root type basedir min-depth]
+  ([root type basedir min-depth & filters]
   (def color-codes
         (let [chromosomes (filter string? (keys root))]
           (zipmap chromosomes (range))))
-  (let [meaningful?
+    (let [meaningful?
         (fn [g]
           (let [N (count g)]
             ((every-pred true?)
@@ -102,7 +131,15 @@
               (>= 100 N))   ; graph has no more than 100 nodes
         ))
 
-        graphs (filter meaningful? (graph/all-subgraphs root (type root) min-depth))
+				filters (flatten (cons filters [meaningful?]))
+				filters (filter identity filters)
+
+        passes?
+        (fn [g] 
+          {:pre (every? identity filters)}
+          (reduce 'and ((apply juxt filters) g)))
+
+        graphs (filter passes? (graph/all-subgraphs root (type root) min-depth))
   		  typestr (name type)]
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))
@@ -111,8 +148,14 @@
         #(spit
             (str basedir "/" typestr "/" typestr "_" %1 ".dot")
             (graph->dot root %2 (str typestr "_" %1)))
-        graphs)))
-  root))
+        graphs))
+    (with-open [wrtr (writer (str basedir "/pressspan.log") :append true)]
+      (doall
+        (map-indexed
+          #(.write wrtr
+            (graph->log root %2 (str typestr "_" %1)))
+          graphs)))
+  root)))
 
 
 (deftest graph-test
