@@ -94,8 +94,15 @@
   (def color-codes
         (let [chromosomes (filter string? (keys root))]
           (zipmap chromosomes (range))))
-  ;; select those graphs which have more than one node (after pruning
-  (let [graphs (filter #(< 1 (count %))(graph/all-subgraphs root (type root) min-depth))
+  (let [meaningful?
+        (fn [g]
+          (let [N (count g)]
+            ((every-pred true?)
+              (< 1 N)      ; graph has more than one nodes
+              (>= 100 N))   ; graph has no more than 100 nodes
+        ))
+
+        graphs (filter meaningful? (graph/all-subgraphs root (type root) min-depth))
   		  typestr (name type)]
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))

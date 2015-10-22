@@ -32,13 +32,6 @@
     :default 1
     :parse-fn #(Integer/parseInt %)
     :validate [pos? "Must be a positive number"]]
- ;  ["-D" "--database TYPE:NAME" "OrientDB database to use. Type in [local plocal remote]. Type remote needs running OrientDB server."
- ;   :default "memory:data"
- ;   :default-desc "memory"]
- ;  ["-U" "--user USERNAME" "Username for remote database"
- ;   :default "admin"]
- ;  ["-P" "--pass PASSWORD" "Password for remote database"
- ;   :default "admin"]
    ["-h" "--help"]])
 
 (def functions

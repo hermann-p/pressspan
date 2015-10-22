@@ -2,9 +2,10 @@
   (:require [pressspan.io])
   (:use [clojure.string :only [split join]]
         clojure.test
-        taoensso.timbre.profiling))
+;        taoensso.timbre.profiling))
+        ))
 
-(defnp parse-header-line
+(defn parse-header-line
   [line]
   (let [tokens (split line #"\s+")]
     (if (= "@SQ" (first tokens))
@@ -15,12 +16,12 @@
         {:id (:SN data), :len (Integer. (:LN data))}))))
 
 
-(defnp header-line?
+(defn header-line?
   [line]
   (= \@ (first line)))
 
 
-(defnp extract-data
+(defn- extract-data
   "maps interesting fields of a tokenized alignment line from a .sam file"
   [tokens]
   (let [[_ flag rname p5 _ cigar _ _ _ _ _] tokens          ; destructure tokens
@@ -28,7 +29,7 @@
     {:chr rname :p5 (Integer. p5) :flag (Integer. flag) :cigar cigar :segemehl sm-keys})) ; return mapped results
 
 
-(defnp extract-split-info
+(defn- extract-split-info
   "extracts split information from segemehl custom tags"
   [tokens]
   (let [tok (for [token tokens] (split token #":"))
@@ -36,14 +37,14 @@
         vals (for [el tok] (last el))]
     (zipmap (map keyword ids) vals)))
 
-(defnp cigar-ops [ops freqs]
+(defn- cigar-ops [ops freqs]
   (reduce
      (fn [m tuple]
        (update m (keyword (first tuple)) (fn [k x] (+ (or k 0) (Integer. x))) (second tuple)))
      {}
      (partition 2 (interleave ops freqs))))
 
-(defnp un-cigar
+(defn- un-cigar
   "calculates the original read length of an alignment with INDELs"
   [cigar]
   (let [freqs (re-seq #"[0-9]+" cigar)
@@ -55,7 +56,7 @@
 
 
 
-(defnp make-frag
+(defn make-frag
   "creates a read fragment node from a string of segemehl-created .sam data"
   [data-string]
   (let [tokens (split data-string #"\t+")

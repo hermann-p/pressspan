@@ -4,10 +4,11 @@
             pressspan.saminput)        ; for tests
   (:use [clojure.set :only [difference union]]
         clojure.test
-        taoensso.timbre.profiling))
+;        taoensso.timbre.profiling))
+        ))
 
 
-(defnp id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
+(defn- id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
 
 
 (defn- get-frag-id
@@ -44,7 +45,7 @@
                            [:mp5frags (im/int-map)]])))))
 
 
-(defnp create-el
+(defn- create-el
 	[root {:keys [chr p3 p5 dir]}]
     (dosync 	
       (let [[l3 l5] (if (= dir :plus) [:p3frags :p5frags] [:mp3frags :mp5frags])
@@ -63,7 +64,7 @@
   (let [link (get-in @root [:links link-id])]
     (and (= (:down link) dn-id)
          (= (:up link) up-id))))
-(defnp get-link-id [root up-id dn-id]
+(defn- get-link-id [root up-id dn-id]
   (assert (id-valid? root up-id) "Invalid upstream-fragment-id")
   (assert (id-valid? root dn-id) "Invalid downstream-fragment-id")
   (first (filter 
@@ -73,7 +74,7 @@
   (get-in @root [:links (get-link-id root up-id dn-id)]))
 
 
-(defnp link-frags
+(defn- link-frags
   [root up-id dn-id & count]
   (assert (id-valid? root up-id) "Invalid upstream-fragment-id")
   (assert (id-valid? root dn-id) "Invalid downstream-fragment-id")
@@ -95,7 +96,7 @@
                   (update-in [:frags dn-id :up] into [link-id])))))))
 
 
-(defnp remember-multistrand
+(defn remember-multistrand
   [root frag]
   (if-let [next (:next frag)]
     (if-not (= (:chr frag) (:chr next)) ; multistrand if elements on different strands
@@ -104,7 +105,7 @@
   frag)
 
 
-(defnp remember-circular
+(defn remember-circular
   [root frag]
   (if-let [next-p5 (:p5 (:next frag))]
     (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
@@ -116,7 +117,7 @@
   frag)
 
 
-(defnp register-fragment
+(defn register-fragment
   [root {:keys[chr p3 p5 dir next prev] :as frag-data}]
   (let [frag (or (get-el root frag-data)
                  (create-el root frag-data))
@@ -138,7 +139,7 @@
   root)
 
 
-(defnp parse-data
+(defn- parse-data
   [root lines funs];[{:keys [head? data-parser add-all]}]]
   (let [add-frag (filter identity (:add-all funs))
         add-frag (mapv #(partial % root) add-frag)
@@ -259,6 +260,5 @@
     (is (= 14 (:nf genome)))
     (is (= 10 (:nl genome)))
     (println (clojure.string/join \newline (get-subgraph genome (first (:multis genome)) 1)))
- ;   (is (= #{0 1 2 3} (set (doall (get-subgraph genome (first (:multis genome)))))))
     (is (= 4 (count (get-subgraph genome (first (:multis genome))))))
     (is (= 5 (count (all-subgraphs genome (:multis genome)))))))
