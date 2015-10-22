@@ -1,5 +1,7 @@
 (ns pressspan.graph
-  (:require [clojure.data.int-map :as im])
+  (:require [clojure.data.int-map :as im]
+            pressspan.io               ; for tests
+            pressspan.saminput)        ; for tests
   (:use [clojure.set :only [difference union]]
         clojure.test
         taoensso.timbre.profiling))

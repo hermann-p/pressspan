@@ -98,13 +98,14 @@
             funs (assoc funs :add-all input-funs)]
         (->
           (time (pressspan.graph/create-genome (:in options) funs))
+          ;((fn [my-in] (println (filter string? (keys my-in)))))
           (pressspan.visualise/write-files :multis (:out options) (:trunc options))
           (pressspan.visualise/write-files :circulars (:out options))
           (pressspan.visualise/write-files :custom (:out options))))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
                "format. Why don't you create them?"))
-    ))
+    nil))
 
 
 ;; Profiling test code
@@ -112,4 +113,4 @@
   (profile :info
            :Arithmetic
            (dotimes [n 1]
-             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" )))))
+             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" )))))

@@ -50,11 +50,12 @@
     (format "0%x" n)))
 
 (defn- chr-color [n]
+  {:pre [(integer? n)]}
   (nth (cycle (for [r (map (partial * 85) (range 4))
              g [255 0 128]
              b (map #(- 255 (* 85 %)) (range 4))]
          (str "#" (hex r) (hex g) (hex b))))
-       (- (* 3 n) 1)))
+       (* 3 n) 1))
 
 
 (defn graph->log [root graph id-string]
@@ -66,30 +67,34 @@
     (clojure.string/join ","
        (sort (set (map :chr graph))))))
 
-
+(declare color-codes)
 (defn graph->dot [root graph id-string]
 	(let [put-el
 				(fn [el]
           (cons 
             (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25,"
                  "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
-                 "color=\"" (chr-color (Integer. (:chr el))) "\"];\n")
+                 "color=\"" (chr-color (get color-codes (:chr el))) "\"];\n")
             (for [link (:up el)]
                (str "  " (:id el) "->" (:up link) " [label=\"" (:depth link) "\"];\n"))))
 	      walk
 	      (fn walk [els]
 	      	(if (seq els)
-	         (conj (walk (rest els)) (clojure.string/join (put-el (first els))))))]
+	         (lazy-seq
+	           (conj (walk (rest els)) (clojure.string/join (put-el (first els)))))))]
 	  (str "digraph " id-string " {" \newline 
          "  rankdir=\"LR\";" \newline
-	       (clojure.string/join (doall (concat (trampoline walk graph))))
+	       (clojure.string/join (doall (concat (walk graph))))
 	       "}")))
 
 
 (defn write-files
   ([root type basedir] (write-files root type basedir 1))
   ([root type basedir min-depth]
-  ;; select those graphs which have more than one node (by truncate function)
+  (def color-codes
+        (let [chromosomes (filter string? (keys root))]
+          (zipmap chromosomes (range))))
+  ;; select those graphs which have more than one node (after pruning
   (let [graphs (filter #(< 1 (count %))(graph/all-subgraphs root (type root) min-depth))
   		  typestr (name type)]
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))

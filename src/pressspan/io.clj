@@ -18,7 +18,8 @@
 
 (defn make-dir [path]
   (if-not (.mkdirs (java.io.File. path))
-    (println "ERROR creating" path))); .mkdirs <-> mkdir -p
+    (println "WARNING: cannot create directory" path
+             "- does it exist already?"))); .mkdirs <-> mkdir -p
 
 
 (deftest io-tests
