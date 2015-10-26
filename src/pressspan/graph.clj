@@ -110,6 +110,7 @@
   (if-let [next-p5 (:p5 (:next frag))]
     (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
       (if ((every-pred true?)
+      				 (= (:dir frag) (:dir (:next frag)))
                (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand and
                (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync

@@ -44,7 +44,9 @@
       (trampoline find-here (set graph) #{} #{} vert-map {} 0 ))))
 
 
-(defn- hex [n]
+(defn- hex
+  "Converts integer n to two-digit hexadecimal number"
+  [n]
   {:pre [(integer? n) (>= n 0) (<= n 255)]}
   (if (> n 16)
     (format "%x" n)
@@ -59,7 +61,9 @@
        (* 3 n) 1))
 
 
-(defn graph->log [root graph id-string]
+(defn graph->log
+  "Creates a tab-seperated CSV string from a graph"
+  [root graph id-string]
   (format "%s\t|%s|\t%s\n"
     id-string 
 	  (clojure.string/join ","
@@ -69,11 +73,14 @@
        (sort (set (map :chr graph))))))
 
 (declare color-codes)
-(defn graph->dot [root graph id-string]
+(defn graph->dot
+  "Creates a .dot format string from a graph"
+  [root graph id-string]
 	(let [put-el
 				(fn [el]
           (cons 
-            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"filled\",height=0.25,"
+            (str "  " (:id el) " [shape=\"rectangle\",border=0,style=\"" 
+                 (if (= :plus (:dir el)) "filled" "bold") "\",height=0.25,"
                  "label=\"" (:chr el) ":" (:p5 el) "-" (:p3 el) "\","
                  "color=\"" (chr-color (get color-codes (:chr el))) "\"];\n")
             (for [link (:up el)]
@@ -92,16 +99,22 @@
 (defn drop-filter
   "Filter to sort out graphs in which any edge has less than [min-depth] reads"
   [min-depth]
+  {:pre [(integer? min-depth)]}
   (fn [graph]
-    (let [depths
-          (flatten (for [node graph] (map :depth (:up node))))]
-      (every? #(<= min-depth %) depths))))
-
+    (every? true?
+	          (for [node graph]
+	               (or (empty? (:up node))
+                     (every? #(<= min-depth %) (map :depth (:up node))))))))
 
 (defn range-filter
-  "Filter all graphs on chromosome chr, stsrandiness dir, p5 or p3
+  "Filter all graphs on chromosome chr, strandiness dir, p5 or p3
    between upper and lower"
-  [chr dir upper lower]
+  [chr dir lower upper]
+  {:pre [(string? chr)
+         (#{:plus :minus} dir)
+         (integer? upper)
+         (integer? lower)
+         (< lower upper)]}
   ; if lower <= x <= upper, then one of [lower-x, upper-x] is <= 0 and one >= 0
   (let [between-limits (fn [x] (<= 0 (* (- lower x) (- upper x))))]
     (fn [graph]
@@ -115,32 +128,28 @@
             	                   (and (< lower (:p3 %)) (> upper (:p5 %))))
                        candidates)]
               (not (every? false? matches))))))))
-        
+
 
 (defn write-files
+  "Writes all subgraphs of a chosen category to .dot files"
   ([root type basedir] (write-files root type basedir 1))
   ([root type basedir min-depth & filters]
-  (def color-codes
-        (let [chromosomes (filter string? (keys root))]
-          (zipmap chromosomes (range))))
-    (let [meaningful?
-        (fn [g]
-          (let [N (count g)]
-            ((every-pred true?)
-              (< 1 N)      ; graph has more than one nodes
-              (>= 100 N))   ; graph has no more than 100 nodes
-        ))
+  (def color-codes                   ; create a lookup-map for colors from chromosome names
+       (let [chromosomes (filter string? (keys root))]
+         (zipmap chromosomes (range))))
+  (let [meaningful?
+      (fn [g] (< 1 (count g) 100))   ; graph has at least two and no more than 100 nodes
 
-				filters (flatten (cons filters [meaningful?]))
-				filters (filter identity filters)
+				filters (flatten (into filters [meaningful?]))
+;		  		filters (filter identity filters)
 
         passes?
-        (fn [g] 
+        (fn [g]
           {:pre (every? identity filters)}
           (reduce 'and ((apply juxt filters) g)))
 
         graphs (filter passes? (graph/all-subgraphs root (type root) min-depth))
-  		  typestr (name type)]
+  	    typestr (name type)]
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))
     (doall
@@ -167,6 +176,8 @@
         genome (pressspan.graph/create-genome filename funs)
         multi (first (:multis genome))
         subgraph (pressspan.graph/get-subgraph genome multi)]
+    (is (true? ((drop-filter 2) [{:up [{:depth 2} {:depth 5}]} {:up [{:depth 3}]} {:down nil}])))
+    (is (false? ((drop-filter 3) [{:up [{:depth 2} {:depth 5}]} {:up [{:depth 3}]} {:down nil}])))
     (write-files genome :multis "test/output" 1)
     (println (graph->dot genome subgraph "testgraph"))
     (println (graph->log genome subgraph "testgraph"))))

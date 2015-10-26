@@ -25,7 +25,7 @@
     :default-desc "N >= 1"]
    ["-R" "--range CHR:start:stop" "Output reads with fragments matching the range. Can only use -p or -R"]
    ["-d" "--drop DEPTH" "Drop isoform trees containing links with read depth lower than DEPTH"
-;    :default 1
+    :default 1
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 %) "Must be a positive number"]]
    ["-t" "--trunc DEPTH" "Truncate isoform tree branches linked with read depth lower than DEPTH"
@@ -60,7 +60,6 @@
   (System/exit (or stat 1)))
 
 
-
   
 (defn -main
   [& args]
@@ -71,7 +70,8 @@
   (let [{:keys [options arguments summary errors]} (parse-opts args cli-options)]
     (cond         ; check argument validity
 ;     (not (seq args)) (exit-after ((usage summary) summary 0)) ; duplicate...
-     (:help options) (exit-after ((usage summary) summary 0))
+     (:help options)
+     (exit-after ((usage summary) summary 0))
 
      (< 0 (count errors))
      (exit-after (error-text errors summary))
@@ -88,12 +88,13 @@
       (let [input-funs [(if (:multistrand options) pressspan.graph/remember-multistrand)
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
+            drop-graphs (pressspan.visualise/drop-filter (:drop options))
+            
             funs (assoc funs :add-all input-funs)]
         (->
           (time (pressspan.graph/create-genome (:in options) funs))
-          ;((fn [my-in] (println (filter string? (keys my-in)))))
           (pressspan.visualise/write-files :multis (:out options) (:trunc options))
-          (pressspan.visualise/write-files :circulars (:out options))
+          (pressspan.visualise/write-files :circulars (:out options) 1 [drop-graphs])
           (pressspan.visualise/write-files :custom (:out options))))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
@@ -106,4 +107,4 @@
 ;  (profile :info
 ;           :Arithmetic
 ;           (dotimes [n 1]
-;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" )))))
+;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" "-d" "3")))))
