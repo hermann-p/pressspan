@@ -1,9 +1,9 @@
 # Introduction
 
 *pressspan* is a tool to visualise genomic data.
-It has been developed with data in mind that has been processed with
+It has been developed with data, that has been processed with
 [segemehl](http://www.bioinf.uni-leipzig.de/Software/segemehl/)
-and the *split* option in mind, to find reads which map to different chromosome strands, multiple chromosomes or are circular.
+and the *split* option, in mind. It can find reads mapped to different chromosome strands, multiple chromosomes or which are circular.
 
 The program uses massive multiprocessing to reassemble the genome and identify such input reads.
 During the assembly, all links containg a specific fragment are merged into a tree-like graph.
@@ -76,5 +76,7 @@ For each subgraphs matching your criteria, a *.dot* graph description file is cr
 In addition, a report file *(out)/pressspan.log* is written. It is a tab-separated file with three columns:
 
 1) **identifier string** which is also the name of the *.dot* file in its specific subdirectory
+
 2) **list of fragment positions**, comma separated, in the format (strand-direction-prefix)(chromosome-id):(5'-position)-(3'-position)
+
 3) **list of chromosomes** to which any reads have been matched, comma-separated
