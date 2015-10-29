@@ -146,7 +146,7 @@
         passes?
         (fn [g]
           {:pre (every? identity filters)}
-          (reduce 'and ((apply juxt filters) g)))
+          (every? true? ((apply juxt filters) g)))
 
         graphs (filter passes? (graph/all-subgraphs root (type root) min-depth))
   	    typestr (name type)]

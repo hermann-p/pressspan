@@ -107,4 +107,4 @@
 ;  (profile :info
 ;           :Arithmetic
 ;           (dotimes [n 1]
-;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" "-d" "3")))))
+;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" "-d" "3")
