@@ -59,13 +59,11 @@ An input file needs to be given. Possible options are:
 
 ## Filtering options
 
-**-r or --report (path-to-file)** Give filename for the report file. OBSOLETE. Defaults to *(out)/pressspan.log*.
+**-r or --range (chr:lower:upper)** Output only reads that contain at least one element the chromosome with ID-string (chr) between the positions (lower) and (upper). Does not (yet?) discriminate between plus and minus strand.
 
-**-R or --range (chr:lower:upper)** Output only reads that contain at least one element the chromosome with ID-string (chr) between the positions (lower) and (upper). Does not (yet?) discriminate between plus and minus strand.
+**-d or --drop (min-depth)** Don't output circular subgraphs in which any link's read depth is lower than (min-depth). Defaults to 1.
 
-**-d or --drop (min-depth)** Don't output subgraphs in which any link's read depth is lower than (min-depth). Defaults to 1.
-
-**-t or --trunc (min-depth)** When building subgraphs, do not include elements which are linked with a depth lower than (min-depth), truncate the graph there instead. Defaults to 1.
+**-t or --trunc (min-depth)** When building multistrand subgraphs, do not include elements which are linked with a depth lower than (min-depth), truncate the graph there instead. Defaults to 1.
 
 **-p or --position (chr:p5-pos)** Find all possible links to a given fragment. NOT IMPLEMENTED YET.
 

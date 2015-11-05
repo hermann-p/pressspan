@@ -115,11 +115,9 @@
          (integer? upper)
          (integer? lower)
          (< lower upper)]}
-  ; if lower <= x <= upper, then one of [lower-x, upper-x] is <= 0 and one >= 0
   (fn [graph]
     (let [candidates (filter #(= chr (:chr %)) graph)
           candidates (filter #(= dir (:dir %)) candidates)]
-        (println "checking range: " graph)
       	(if (empty? candidates) false
       	  (let [matches 
       	  ; test nodes if the read overlaps the boundaries partially or completely
@@ -151,7 +149,6 @@
 
         graphs (filter passes? (graph/all-subgraphs root (type root) min-depth))
   	    typestr (name type)]
-  	(println "Applied filters:" \newline (clojure.string/join "\n " filters))
     (println "Writing" (count graphs) typestr "graph files to" (str basedir "/" typestr))
     (pressspan.io/make-dir (str basedir "/" typestr))
     (doall

@@ -17,13 +17,13 @@
    ["-o" "--out PATH_TO_FILE" "Output file name prefix"
     :default "pressspan_analysis"
     :default-desc "pressspan_analysis"]
-   ["-r" "--report PATH_TO_FILE" "Create csv report and write it to FILE"
-    :default "report.csv"
-    :default-desc "report.csv"]
-   ["-p" "--position CHR:xx [CHR:xx...]" "Output reads with fragments matching the  positions"
+;   ["-p" "--position CHR:xx [CHR:xx...]" "Output reads with fragments matching the  positions"
 ;    :default "0:0"
-    :default-desc "N >= 1"]
-   ["-R" "--range CHR:start:stop" "Output reads with fragments matching the range. Can only use -p or -R"]
+;    :default-desc "N >= 1"]
+   ["-r" "--range CHR:start:stop" "Output reads with fragments matching the range. Can only use -p or -R"
+     :validate [#({\+ \-} (first %)) "Range must start with strandiness symbol from {+, -}"
+                #(= 3 (count (clojure.string/split (clojure.string/join (rest %)) #"[:-]"))) "Format: (+/-)chr:lower-upper"]
+     :default-desc "(+/-)chr:lower-upper"]
    ["-d" "--drop DEPTH" "Drop isoform trees containing links with read depth lower than DEPTH"
     :default 1
     :parse-fn #(Integer/parseInt %)
@@ -118,4 +118,4 @@
 ;           :Arithmetic
 ;           (dotimes [n 1]
 ;             (p :pressspan 
-;                (-main "-i" "test/data/5_out.sam" "-m" "-c" "-t" "1" "-d" "1" "-o" "range_test" "-R" "+3:1-100")
+;                (-main "-i" "test/data/5_out.sam" "-m" "-c" "-t" "1" "-d" "1" "-o" "range_test" "-r" "+3:1-100")
