@@ -89,12 +89,22 @@
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
             drop-graphs (pressspan.visualise/drop-filter (:drop options))
+						range-check (if-not (:range options)
+						               (fn [_] true) ; dummy function returning true
+						               (let [range-str (:range options)
+						               	     tokens (clojure.string/split (clojure.string/join (rest range-str)) #"[:-]")
+						                     strand (if (= \+ (first range-str)) :plus :minus)
+						                     dummy (println "#### TOKENS:" tokens)
+						                     chr (first tokens)
+						                     lower (Integer. (second tokens))
+						                     upper (Integer. (last tokens))]
+						                  (pressspan.visualise/range-filter chr strand lower upper)))
             
             funs (assoc funs :add-all input-funs)]
         (->
           (time (pressspan.graph/create-genome (:in options) funs))
-          (pressspan.visualise/write-files :multis (:out options) (:trunc options))
-          (pressspan.visualise/write-files :circulars (:out options) 1 [drop-graphs])
+          (pressspan.visualise/write-files :multis (:out options) (:trunc options) [range-check])
+          (pressspan.visualise/write-files :circulars (:out options) 1 [range-check drop-graphs])
           (pressspan.visualise/write-files :custom (:out options))))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
@@ -107,4 +117,5 @@
 ;  (profile :info
 ;           :Arithmetic
 ;           (dotimes [n 1]
-;             (p :pressspan (-main "-i" "test/data/large.sam" "-m" "-c" "-t" "3" "-d" "3")
+;             (p :pressspan 
+;                (-main "-i" "test/data/5_out.sam" "-m" "-c" "-t" "1" "-d" "1" "-o" "range_test" "-R" "+3:1-100")
