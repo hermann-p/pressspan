@@ -42,7 +42,7 @@
      (fn [m tuple]
        (update m (keyword (first tuple)) (fn [k x] (+ (or k 0) (Integer. x))) (second tuple)))
      {}
-     (partition 2 (interleave ops freqs))))
+     (map #(list %1 %2) ops freqs)))
 
 (defn- un-cigar
   "calculates the original read length of an alignment with INDELs"
@@ -65,31 +65,28 @@
         sm (extract-split-info (:segemehl data)) ; segemehl custom split data
         forward (= 0 (bit-and 16 (:flag data)))]  ; 0x10 => reverse
     
-    (-> {:dir (if forward :plus :minus)
-         :chr (:chr data)
+    {:dir (if forward :plus :minus)
+     :chr (:chr data)
 ;         :p5 (Integer. (:XX sm))   ; segemehl reports positions in query, not 
 ;         :p3 (Integer. (:XY sm))}  ; on chromosome!
 
-         :p5 (:p5 data)
-         :p3 (+ (:p5 data) (un-cigar (:cigar data)) (- 1))}
-         
-        (assoc :prev
-             (if-let [pchr (:XP sm)]
-               {:chr pchr
-                :p3 (Integer. (:XU sm))
-                :dir (if (= "0" (:XS sm))
-                       :minus
-                       :plus)}
-               nil))
+     :p5 (:p5 data)
+     :p3 (+ (:p5 data) (un-cigar (:cigar data)) (- 1))
+     
+    	:prev (if-let [pchr (:XP sm)]
+           {:chr pchr
+            :p3 (Integer. (:XU sm))
+            :dir (if (= "0" (:XS sm))
+                   :minus
+                   :plus)})
 
-        (assoc :next
-          (if-let [nchr (:XC sm)]
-            {:chr nchr
-             :p5 (Integer. (:XV sm))
-             :dir (if (= "0" (:XT sm))
-                    :minus
-                    :plus)}
-            nil)))))
+    	:next (if-let [nchr (:XC sm)]
+        	{:chr nchr
+         		:p5 (Integer. (:XV sm))
+         		:dir (if (= "0" (:XT sm))
+                :minus
+                :plus)})
+     }))
 
 (deftest sam-processing-test
   (let [hdr-line "@SQ\tSN:1\tLN:3000"
