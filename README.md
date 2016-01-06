@@ -57,6 +57,8 @@ An input file needs to be given. Possible options are:
 
 **-c or --circular** Detect reads containing fragments showing clues for circularity and write their *.dot* files to *(out)/circulars*
 
+**-s or --bins** Adapt number of bins for frequency reports. Defaults to 10k bins per chromosome.
+
 ## Filtering options
 
 **-r or --range (chr:lower:upper)** Output only reads that contain at least one element the chromosome with ID-string (chr) between the positions (lower) and (upper). Does not (yet?) discriminate between plus and minus strand.
@@ -70,6 +72,8 @@ An input file needs to be given. Possible options are:
 # Output
 
 For each subgraphs matching your criteria, a *.dot* graph description file is created in its corresponding subfolder. To visualise the results you can use tools like [GraphViz](http://www.graphviz.org).
+
+The frequency of events found is reported to the tab-seperated files *(out)/multistrand.csv* and *(out)/circulars.csv*. Within these files, the first line contains the chromosome names, the second line contains the size of each bin on the chromosome in bases, and all following lines contain the number of times an event was detected in the respective segment (that is, between (line-number - 2) * bin-size and (line-nmuber - 1) * bin-size.
 
 In addition, a report file *(out)/pressspan.log* is written. It is a tab-separated file with three columns:
 

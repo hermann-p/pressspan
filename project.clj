@@ -1,5 +1,5 @@
-(defproject pressspan "0.1.0"
-  :description "A genome reassembly and visualisation tool"
+(defproject pressspan "0.1.1"
+  :description "A segemehl reassembly and visualisation tool"
   :url "https://bitbucket.org/waechtertroll/pressspan"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}

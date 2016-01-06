@@ -70,4 +70,12 @@
           genome (pg/create-genome filename funs)]
       (ps/empty-stats genome 100)
       (ps/get-pairs genome ps/is-multi? (:multis genome))
-      (ps/write-stat-file "test/output/multi.csv" :multis 1000 genome))))
+      (ps/write-stat-file genome "test/output/multi.csv" :multis 1000))))
+
+(deftest full-test
+  (testing "Full app"
+    (pc/-main "-m"
+               "-c"
+               "-i" "test/data/5_out.sam"
+               "-o" "test/full"
+               "-s" "100")))

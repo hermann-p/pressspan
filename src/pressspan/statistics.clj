@@ -47,9 +47,14 @@
   (for [k (sort (keys s))]
     (get-in s [k :vals n])))
 
+(defn get-bucket-sizes [s]
+  (for [k (sort (keys s))]
+    (get-in s [k :bsize])))
+
 
 (defn write-stat-file
-  [file-name seed-key n-buckets genome]
+  [genome file-name seed-key n-buckets]
+  (println "Writing statistics:" file-name "with" n-buckets "buckets per chromosome...")
   (let [[pred seeds] (if (= :multis seed-key)
                        [is-multi? (:multis genome)]
                        [is-circular? (:circulars genome)])
@@ -66,6 +71,8 @@
                (get-pairs genome pred seeds))]
     (with-open [wrtr (writer file-name)]
       (.write wrtr (clojure.string/join "\t" (sort (keys stats))))
+      (.write wrtr "\n")
+      (.write wrtr (clojure.string/join "\t" (get-bucket-sizes stats)))
       (.write wrtr "\n")
       (loop [i 0]
         (when (< i n-buckets)
