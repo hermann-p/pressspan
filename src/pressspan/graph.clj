@@ -8,10 +8,10 @@
         ))
 
 
-(defn- id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
+(defn id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
 
 
-(defn- get-frag-id
+(defn get-frag-id
 	[root {:keys [chr p3 p5 dir] :as query}]
 	(let [[lnk pos] (if p5
                    [(if (= dir :plus) :p5frags :mp5frags) p5]
@@ -32,7 +32,7 @@
   (get-in @root [:frags id]))
 
 
-(defn- create-chr
+(defn create-chr
   [root id len]
   (dosync 
     (alter root
@@ -45,7 +45,7 @@
                            [:mp5frags (im/int-map)]])))))
 
 
-(defn- create-el
+(defn create-el
 	[root {:keys [chr p3 p5 dir]}]
     (dosync 	
       (let [[l3 l5] (if (= dir :plus) [:p3frags :p5frags] [:mp3frags :mp5frags])
@@ -60,21 +60,21 @@
         new-el)))
 
 
-(defn- is-link? [root up-id dn-id link-id]
+(defn is-link? [root up-id dn-id link-id]
   (let [link (get-in @root [:links link-id])]
     (and (= (:down link) dn-id)
          (= (:up link) up-id))))
-(defn- get-link-id [root up-id dn-id]
+(defn get-link-id [root up-id dn-id]
   (assert (id-valid? root up-id) "Invalid upstream-fragment-id")
   (assert (id-valid? root dn-id) "Invalid downstream-fragment-id")
   (first (filter 
            (partial is-link? root up-id dn-id)
            (get-in @root [:frags up-id :down]))))
-(defn- get-link [root up-id dn-id]
+(defn get-link [root up-id dn-id]
   (get-in @root [:links (get-link-id root up-id dn-id)]))
 
 
-(defn- link-frags
+(defn link-frags
   [root up-id dn-id & count]
   (assert (id-valid? root up-id) "Invalid upstream-fragment-id")
   (assert (id-valid? root dn-id) "Invalid downstream-fragment-id")
@@ -99,7 +99,9 @@
 (defn remember-multistrand
   [root frag]
   (if-let [next (:next frag)]
-    (if-not (= (:chr frag) (:chr next)) ; multistrand if elements on different strands
+    (if-not (and
+             (= (:chr frag) (:chr next))
+             (= (:dir frag) (:dir next))); multistrand if elements on different strands
       (dosync
         (commute root update-in [:multis] conj (:id frag)))))
   frag)
@@ -129,7 +131,7 @@
     (assoc frag-data :id (:id frag))))
 
 
-(defn- parse-header
+(defn parse-header
   [root lines funs]; [{:keys [head? header-parser]}]]
   (doseq [line lines :while ((:head? funs) line)]
     (if-let [chromosome ((:header-parser funs) line)]
@@ -140,7 +142,7 @@
   root)
 
 
-(defn- parse-data
+(defn parse-data
   [root lines funs];[{:keys [head? data-parser add-all]}]]
   (let [add-frag (filter identity (:add-all funs))
         add-frag (mapv #(partial % root) add-frag)
@@ -168,13 +170,13 @@
 ;;; Postprocessing functions work on maps, NOT ref's
 ;;;#############################################################################
 
-(defn- get-both [graph trunc lnk-id]
+(defn get-both [graph trunc lnk-id]
   (let [el (get-in graph [:links lnk-id])]
  ;   (println "el:" el "minimum link depth:" trunc "pass:" (<= trunc (:depth el)))
     (if (<= trunc (:depth el))
       ((juxt :up :down) el))))
 
-(defn- get-adjacent 
+(defn get-adjacent 
   ([graph el-id] (get-adjacent graph el-id 1))
   ([graph el-id trunc]
 ;    (println "get-adjacent graph" el-id "trunc:" trunc)
@@ -185,7 +187,7 @@
       (difference links #{el-id}))))
 
 
-(defn- prune [root node-id min-depth]
+(defn prune [root node-id min-depth]
   (let [node (get-in root [:frags node-id])
         up-links (map #(get-in root [:links %]) (:up node))
         dn-links (map #(get-in root [:links %]) (:down node))
@@ -231,35 +233,3 @@
                         (walk (difference unvisited (set (map :id sg))))))))))]
       (walk indices))))
             
-          
-(deftest structuretest
-  (let [A {:chr "1" :p5 1 :p3 177 :dir :plus}
-        B {:chr "2" :p5 199 :p3 521 :dir :plus}
-        C {:chr "2" :p5 1 :p3 127 :dir :plus}
-        genome (ref {:frags (im/int-map), :nf 0, :links (im/int-map), :nl 0})]
-    (create-chr genome "1" 1000)
-    (create-chr genome "2" 1000)
-    (create-el genome {:chr "1" :p5 200 :p3 300 :dir :plus})
-    (is (map? (create-el genome A)))
-    (is (map? (create-el genome B)))
-    (is (map? (register-fragment genome (assoc C :prev B))))
-    (is (map? (get-el genome A)))
-    (is (map? (get-el genome B)))
-    (is (nil? (get-el genome (assoc B :dir :minus))))
-    (is (nil? (get-el genome (assoc A :chr "negative-test"))))
-    (link-frags genome (:id (get-el genome A)) (:id (get-el genome B)))
-    (link-frags genome (:id (get-el genome A)) (:id (get-el genome C)))))
-
-(deftest samtest
-  (let [filename "test/data/5_out.sam"
-        funs {:head? pressspan.saminput/header-line?
-              :header-parser pressspan.saminput/parse-header-line
-              :data-parser pressspan.saminput/make-frag
-              :add-all [remember-multistrand remember-circular register-fragment]}
-        genome (create-genome filename funs)]
-    (is (map? genome))
-    (is (= 14 (:nf genome)))
-    (is (= 10 (:nl genome)))
-    (println (clojure.string/join \newline (get-subgraph genome (first (:multis genome)) 1)))
-    (is (= 4 (count (get-subgraph genome (first (:multis genome))))))
-    (is (= 5 (count (all-subgraphs genome (:multis genome)))))))

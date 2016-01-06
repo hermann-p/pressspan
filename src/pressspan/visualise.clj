@@ -164,19 +164,3 @@
             (graph->log root %2 (str typestr "_" %1)))
           graphs)))
   root)))
-
-
-(deftest graph-test
-  (let [filename "test/data/5_out.sam"
-        funs {:head? pressspan.saminput/header-line?
-              :header-parser pressspan.saminput/parse-header-line
-              :data-parser pressspan.saminput/make-frag
-              :add-all [pressspan.graph/remember-multistrand pressspan.graph/register-fragment]}
-        genome (pressspan.graph/create-genome filename funs)
-        multi (first (:multis genome))
-        subgraph (pressspan.graph/get-subgraph genome multi)]
-    (is (true? ((drop-filter 2) [{:up [{:depth 2} {:depth 5}]} {:up [{:depth 3}]} {:down nil}])))
-    (is (false? ((drop-filter 3) [{:up [{:depth 2} {:depth 5}]} {:up [{:depth 3}]} {:down nil}])))
-    (write-files genome :multis "test/output" 1)
-    (println (graph->dot genome subgraph "testgraph"))
-    (println (graph->log genome subgraph "testgraph"))))
