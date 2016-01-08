@@ -40,7 +40,7 @@
                    [(:chr link) (:p3 link)]
                    (get-in genome [:links l :depth])])))))
         seeds)
-       (filter identity)))
+       (filter #(every? identity [(seq %) (identity (first %))]))))
 
 
 (defn get-line [n s]
@@ -50,6 +50,11 @@
 (defn get-bucket-sizes [s]
   (for [k (sort (keys s))]
     (get-in s [k :bsize])))
+    
+(defn bucket-size [root n]
+  {:pre [(identity (get root n))
+         (get-in root [n :bsize])]}
+  (get-in root [n :bsize]))
 
 
 (defn write-stat-file
@@ -60,13 +65,16 @@
                        [is-circular? (:circulars genome)])
         stats (reduce
                (fn [s vals]
+;;                {:pre [(seq s) (seq vals)]}
+                (if-not (seq vals)
+                 s
                  (let [[[id-a pa] [id-b pb] l] (first vals)
-                       end-a (min (int (/ pa (get-in s [id-a :bsize])))
+                       end-a (min (int (/ pa (bucket-size s id-a)))
                                   (dec n-buckets))
-                       start-b (min (int (/ pb (get-in s [id-b :bsize])))
+                       start-b (min (int (/ pb (bucket-size s id-b)))
                                     (dec n-buckets))]
                    (-> (update-in s [id-a :vals end-a] #(+ % l))
-                       (update-in [id-b :vals start-b] #(+ % l)))))
+                       (update-in [id-b :vals start-b] #(+ % l))))))
                (empty-stats genome n-buckets)
                (get-pairs genome pred seeds))]
     (with-open [wrtr (writer file-name)]
