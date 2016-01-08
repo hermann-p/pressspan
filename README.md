@@ -14,7 +14,7 @@ Output can be filtered by a number of criteria. All elements matching the given 
 
 ## Binary version
 
-The binary *presspan-xxx-standalone.jar* file is independent of system and needs only a somewhat recent Java runtime environment (tested on Java major versions 7 and 8).
+The binary *presspan-xxx-standalone.jar* file is independent of system and needs only a somewhat recent Java runtime environment (major version 7 or later).
 
 ## Compile it
 
@@ -43,7 +43,9 @@ when you are done to save disk space
 java -jar path/to/pressspan-xxx-standalone.jar -i (input file name) [options]
 ```
 
-An input file needs to be given. Possible options are:
+An input file is mandatory. It is advised to give at least one of *-c*, *-m*, else reassembly is pointless.
+
+Possible further options are:
 
 ## Basic options
 
@@ -67,13 +69,17 @@ An input file needs to be given. Possible options are:
 
 **-t or --trunc (min-depth)** When building multistrand subgraphs, do not include elements which are linked with a depth lower than (min-depth), truncate the graph there instead. Defaults to 1.
 
-**-p or --position (chr:p5-pos)** Find all possible links to a given fragment. NOT IMPLEMENTED YET.
-
 # Output
+
+## Subgraphs
 
 For each subgraphs matching your criteria, a *.dot* graph description file is created in its corresponding subfolder. To visualise the results you can use tools like [GraphViz](http://www.graphviz.org).
 
-The frequency of events found is reported to the tab-seperated files *(out)/multistrand.csv* and *(out)/circulars.csv*. Within these files, the first line contains the chromosome names, the second line contains the size of each bin on the chromosome in bases, and all following lines contain the number of times an event was detected in the respective segment (that is, between (line-number - 2) * bin-size and (line-nmuber - 1) * bin-size.
+## Frequency statistics
+
+The frequency of events found is reported to the tab-seperated files *(out)/multistrand.csv* and *(out)/circulars.csv*. Within these files, the first line contains the chromosome names, the second line contains the size of each bin on the chromosome in bases, and all following lines contain the number of times an event was detected in the respective segment (that is, between (line-number - 2) * bin-size and (line-nmuber - 1) * bin-size).
+
+## Summary
 
 In addition, a report file *(out)/pressspan.log* is written. It is a tab-separated file with three columns:
 
