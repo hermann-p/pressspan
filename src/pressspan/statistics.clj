@@ -6,7 +6,7 @@
         len (:len (second input))]
     {id
      {:id id
-      :bsize (int (/ len n))
+      :bsize (max 1 (int (/ len n)))
       :vals (vec (take n (cycle [0])))}}))
 
 (defn empty-stats [genome n-buckets]
@@ -26,7 +26,10 @@
 
 (defn is-circular? [a b]
   {pre [(map? a) (map? b)]}
-  (every? true? [(= (:chr a) (:chr b)) (= (:dir a) (:dir b)) (< (:p3 b) (:p3 a))]))
+  (let [upstream? (if (= :plus (:dir a)) < >)]
+    (every? true? [(= (:chr a) (:chr b))
+                   (= (:dir a) (:dir b))
+                   (upstream? (:p5 b) (:p5 a))])))
 
 
 (defn get-pairs [genome pred? seeds]
@@ -65,7 +68,6 @@
                        [is-circular? (:circulars genome)])
         stats (reduce
                (fn [s vals]
-;;                {:pre [(seq s) (seq vals)]}
                 (if-not (seq vals)
                  s
                  (let [[[id-a pa] [id-b pb] l] (first vals)
@@ -89,4 +91,5 @@
              "\t"
              (get-line i stats)))
           (.write wrtr "\n")
-          (recur (inc i)))))))
+          (recur (inc i))))))
+    genome)
