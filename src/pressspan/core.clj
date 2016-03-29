@@ -100,8 +100,8 @@
             funs (assoc funs :add-all input-funs)]
         (->
          (time (pressspan.graph/create-genome (:in options) funs))
-         (pressspan.visualise/write-files :multis (:out options) (:trunc options) [range-check])
-         (pressspan.visualise/write-files :circulars (:out options) 1 [range-check drop-graphs])
+         (pressspan.visualise/write-files :multis (:out options) (:trunc options) [range-check drop-graphs])
+         (pressspan.visualise/write-files :circulars (:out options) (:trunc options) [range-check drop-graphs])
          (pressspan.statistics/write-stat-file (str (:out options) "/multistrand.csv") :multis (:bins options))
          (pressspan.statistics/write-stat-file (str (:out options) "/circulars.csv") :circulars (:bins options))))
       (println "No functions known to treat" 
