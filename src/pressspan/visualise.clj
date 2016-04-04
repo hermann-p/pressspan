@@ -5,45 +5,6 @@
             [clojure.java.io :refer [writer]]))
 
 
-(defn assign-layers
-  "returns graph element with assigned layers.
-   root  - map create by pressspan.graph/create-genome
-   graph - seq of element indices"
-  [root graph]
-  (letfn
-    [(up-known? [up-known verts el-id]
-                (let [el (get verts el-id)
-                      links (map #(get-in root [:links %]) (:up el))
-                      this-up (set (map :up links))]
-                  (empty? (difference this-up up-known))))    ; el has no unknown upstream links
-     
-     (find-next [free verts up-els]
-                (first (filter (partial up-known? up-els verts) free)))
-     
-     (find-here [free up-els els-here vert-map layered-graph layer]
-                (if (seq free)
-                  (if-let [v (find-next free vert-map up-els)]
-                               
-                    (find-here                            ; map found el to current layer
-                      (disj free v)                            ; remove it from available els
-                      up-els                                   ; leave upper layer elements alone
-                      (conj els-here v)                        ; store el in els of this layer
-                      (assoc-in vert-map [v :layer] layer)     ; assign layer number to el
-                      (update-in layered-graph [layer] conj v) ; add element to layered graph
-                      layer)                                   ; keep layer number
-                    (find-here                            ; step up one layer
-                      free                                     ; keep free elements
-                      (union up-els els-here)                  ; save elements in "known from upper layer"
-                      #{}                                      ; empty set of els in new layer
-                      vert-map                                 ; keep vertices
-                      layered-graph                            ; keep layered graph
-                      (inc layer)))                            ; increase layer number
-                  layered-graph))]
-    (let [vertices (mapv #(get-in root [:frags %]) graph)
-          vert-map (zipmap graph vertices)]
-      (trampoline find-here (set graph) #{} #{} vert-map {} 0 ))))
-
-
 (defn- hex
   "Converts integer n to two-digit hexadecimal number"
   [n]
@@ -52,7 +13,9 @@
     (format "%x" n)
     (format "0%x" n)))
 
-(defn- chr-color [n]
+(defn- chr-color
+  "Automatically generates color for nth chromosome"
+  [n]
   {:pre [(integer? n)]}
   (nth (cycle (for [r (map (partial * 85) (range 4))
              g [255 0 128]
@@ -72,7 +35,7 @@
     (clojure.string/join ","
        (sort (set (map :chr graph))))))
 
-(declare color-codes)
+(declare color-codes) ;; forward declaration
 (defn graph->dot
   "Creates a .dot format string from a graph"
   [root graph id-string]

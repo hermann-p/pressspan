@@ -8,7 +8,7 @@
             [clojure.tools.cli :refer [parse-opts]])
   (:gen-class))
 
-
+;; Structure for command line options
 (def cli-options
   [["-m" "--multistrand" "Search for multistrand splits"]
    ["-c" "--circular" "Search for circular transcripts"]
@@ -36,6 +36,7 @@
     :validate [pos? "Must be a positive number"]]
    ["-h" "--help"]])
 
+;; Maps file-type specific functions
 (def functions
   {"sam" {:head? pressspan.saminput/header-line?
           :header-parser pressspan.saminput/parse-header-line
@@ -43,7 +44,9 @@
           :add-all pressspan.graph/register-fragment}})
 
 
-(defn usage [summary]
+(defn usage
+  "Print a formatted help message"
+  [summary]
   (println (clojure.string/join \newline [
                                           " "
                                           "pressspan 0.1"
@@ -52,12 +55,16 @@
                                           " "
                                           ])))
 
-(defn error-text [errors summary]
+(defn error-text
+  "Print error message and usage information"
+  [errors summary]
   (usage summary)
   (println (clojure.string/join \newline errors)))
 
 
-(defn exit-after [fun & stat]
+(defn exit-after
+  "Execute a function, then exit cleanly. Called when errors occured."
+  [fun & stat]
   (try (fun) (catch Exception e))
   (System/exit (or stat 1)))
 
