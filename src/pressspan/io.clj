@@ -3,6 +3,7 @@
         clojure.test))
 
 (defn lazy-file
+  "Wrapper for memory-efficient lazy file reading"
   [file-name]
   (letfn [(helper [rdr]
             (lazy-seq
@@ -16,7 +17,9 @@
         ))))
 
 
-(defn make-dir [path]
+(defn make-dir
+  "Create a directory if it doesn't exist yet"
+  [path]
   (if-not (.mkdirs (java.io.File. path))
     (println "WARNING: cannot create directory" path
              "- does it exist already?"))); .mkdirs <-> mkdir -p
