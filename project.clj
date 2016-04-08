@@ -1,4 +1,4 @@
-(defproject pressspan "0.1.1"
+(defproject pressspan "0.1.2"
   :description "A segemehl reassembly and visualisation tool"
   :url "https://bitbucket.org/waechtertroll/pressspan"
   :license {:name "Eclipse Public License"
