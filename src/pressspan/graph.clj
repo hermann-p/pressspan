@@ -1,10 +1,9 @@
 (ns pressspan.graph
   (:require [clojure.data.int-map :as im]
-            pressspan.io               ; for tests
-            pressspan.saminput)        ; for tests
+            [pressspan.statistics :as stats]
+            pressspan.io)
   (:use [clojure.set :only [difference union]]
         clojure.test
-;        taoensso.timbre.profiling))
         ))
 
 
@@ -96,27 +95,33 @@
                   (update-in [:frags dn-id :up] into [link-id])))))))
 
 
+(declare mult-freqs)
 (defn remember-multistrand
-  [root frag]
-  (if-let [next (:next frag)]
-    (if-not (and
+  [genome frag]
+  (when-let [next (:next frag)]
+    (when-not (and
              (= (:chr frag) (:chr next))
              (= (:dir frag) (:dir next))); multistrand if elements on different strands
       (dosync
-        (commute root update-in [:multis] conj (:id frag)))))
+       (commute genome update-in [:multis] conj (:id frag)))
+      (stats/increase genome mult-freqs (:chr frag) (:p3 frag) (:dir frag))
+      (stats/increase genome mult-freqs (:chr next) (:p5 next) (:dir next))))
   frag)
 
 
+(declare circ-freqs)
 (defn remember-circular
-  [root frag]
+  [genome frag]
   (if-let [next-p5 (:p5 (:next frag))]
     (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
-      (if ((every-pred true?)
+      (when ((every-pred true?)
       				 (= (:dir frag) (:dir (:next frag)))
                (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand and
                (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync
-          (commute root update-in [:circulars] conj (:id frag))))))
+         (commute genome update-in [:circulars] conj (:id frag)))
+        (stats/increase genome mult-freqs (:chr frag) (:p3 frag) (:dir frag))
+        (stats/increase genome mult-freqs (:chr next) (:p5 next) (:dir next)))))
   frag)
 
 
@@ -151,7 +156,7 @@
       (add-frag ((:data-parser funs) line)))))
 
 (defn create-genome
-  [filename funs]
+  [filename funs & bins]
   (println "Reading from file:" filename \newline)
   (let [genome (ref {:frags (im/int-map), :nf 0
                      :links (im/int-map), :nl 0
@@ -160,10 +165,15 @@
     (assert (seq? file))
     (println "Processing header" \newline)
     (time (parse-header genome file funs))
+    ;; Create new parallel data...
+    (def circ-freqs (ref (stats/empty-stats @genome (or bins 10000))))
+    (def mult-freqs (ref (stats/empty-stats @genome (or bins 10000))))
     (println "Processing data...")
     (time (parse-data genome file funs))
     (println "File read.")
-    @genome))
+    (-> @genome
+        (assoc :mstat @mult-freqs
+               :cstat @circ-freqs))))
 
 
 ;;;#############################################################################

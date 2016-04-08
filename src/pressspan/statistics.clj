@@ -5,7 +5,9 @@
   "Create zero-initialized statistics row with [len] buckets"
   [input n]
   (let [id (first input)
-        len (:len (second input))]
+        len (:len (second input))
+        n (if (seq? n) (first n) n)]
+    (println "len" (type len) len "n" (type n) n)
     {id
      {:id id
       :bsize (max 1 (int (/ len n)))
@@ -16,46 +18,6 @@
   [genome n-buckets]
   (reduce into {} (map #(add-empty-stats % n-buckets)
                        (dissoc genome :frags :links :multis :circulars :custom :nl :nf))))
-
-
-(defn get-linked
-  "Retrieve all downstream linked fragments of a fragment"
-  [genome link-id]
-  (let [el-id (get-in genome [:links link-id :down])]
-    (get-in genome [:frags el-id])))
-
-
-(defn is-multi?
-  "Are fragments a and b linked by multistrand splicing?"
-  [a b]
-  {:pre [(map? a) (map? b)]}
-  ((some-fn true?) (not= (:chr a) (:chr b)) (not= (:dir a) (:dir b))))
-
-
-(defn is-circular?
-  "Are a and b linked by backsplicing?"
-  [a b]
-  {pre [(map? a) (map? b)]}
-  (let [upstream? (if (= :plus (:dir a)) < >)]
-    (every? true? [(= (:chr a) (:chr b))
-                   (= (:dir a) (:dir b))
-                   (upstream? (:p5 b) (:p5 a))])))
-
-
-(defn get-pairs
-  "Get both ends of all splicing of type pred {is-multi?, is-circular?}"
-  [genome pred? seeds]
-  (->> (pmap
-        (fn [s]
-          (let [s (get-in genome [:frags s])]
-            (for [l (:down s)]
-              (let [link (get-linked genome l)]
-                (if (pred? s link)
-                  [[(:chr s) (:p5 s)]
-                   [(:chr link) (:p3 link)]
-                   (get-in genome [:links l :depth])])))))
-        seeds)
-       (filter #(every? identity [(seq %) (identity (first %))]))))
 
 (defn get-line
   "Retrieve the nth sorted line of a statistics table"
@@ -76,40 +38,35 @@
          (get-in root [n :bsize])]}
   (get-in root [n :bsize]))
 
+(defn increase
+  "Increase number of counts for element"
+  [root stat chr pos dir]
+  (dosync
+   (let [bs (get-in @stat [chr :bsize])
+         pos (int (if (= :plus dir)
+                    (/ pos bs)
+                    (/ (- (get-in @root [chr :len]) pos) bs)))]
+     (commute stat update-in [chr :vals pos] inc))))
 
 (defn write-stat-file
   "Generate a statistics table for a event type from a genome and
   write it to a file. [seed-key] from {:multis, :circulars} defines
   type of events"
-  [genome file-name seed-key n-buckets]
-  (println "Writing statistics:" file-name "with" n-buckets "buckets per chromosome...")
-  (let [[pred seeds] (if (= :multis seed-key)
-                       [is-multi? (:multis genome)]
-                       [is-circular? (:circulars genome)])
-        stats (reduce
-               (fn [s vals]
-                (if-not (seq vals)
-                 s
-                 (let [[[id-a pa] [id-b pb] l] (first vals)
-                       end-a (min (int (/ pa (bucket-size s id-a)))
-                                  (dec n-buckets))
-                       start-b (min (int (/ pb (bucket-size s id-b)))
-                                    (dec n-buckets))]
-                   (-> (update-in s [id-a :vals end-a] #(+ % l))
-                       (update-in [id-b :vals start-b] #(+ % l))))))
-               (empty-stats genome n-buckets)
-               (get-pairs genome pred seeds))]
+  [genome file-name seed-key]
+  (let [stats (sort (if (= :multis seed-key) (genome :mstat) (genome :cstat)))]
+    (println "Writing statistics:" file-name)
     (with-open [wrtr (writer file-name)]
-      (.write wrtr (clojure.string/join "\t" (sort (keys stats))))
+      (.write wrtr (clojure.string/join "\t" (keys stats)))
       (.write wrtr "\n")
       (.write wrtr (clojure.string/join "\t" (get-bucket-sizes stats)))
       (.write wrtr "\n")
-      (loop [i 0]
-        (when (< i n-buckets)
-          (.write wrtr
-            (clojure.string/join
-             "\t"
-             (get-line i stats)))
-          (.write wrtr "\n")
-          (recur (inc i))))))
-    genome)
+      (let [stats (map second stats)]
+        (loop [rem (map :vals stats)]
+          (when (seq (first rem))
+            (.write wrtr
+                    (clojure.string/join
+                     "\t"
+                     (map first rem)))
+            (.write wrtr "\n")
+            (recur (map rest rem)))))))
+  genome)

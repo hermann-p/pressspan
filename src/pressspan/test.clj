@@ -57,17 +57,6 @@
       (is (false? ((pv/drop-filter 3) [{:up [{:depth 2} {:depth 5}]} {:up [{:depth 3}]} {:down nil}])))
       (pv/write-files genome :multis "test/output" 1)
       (println (pv/graph->dot genome subgraph "testgraph"))
-      (println (pv/graph->log genome subgraph "testgraph")))))
-
-
-(deftest stat-test
-  (testing "statistics.clj"
-    (let [filename "test/data/5_out.sam"
-          funs {:head? psi/header-line?
-                :header-parser psi/parse-header-line
-                :data-parser psi/make-frag
-                :add-all [pg/remember-multistrand pg/register-fragment]}
-          genome (pg/create-genome filename funs)]
-      (ps/empty-stats genome 100)
-      (ps/get-pairs genome ps/is-multi? (:multis genome))
-      (ps/write-stat-file "test/output/multi.csv" :multis 1000 genome))))
+      (println (pv/graph->log genome subgraph "testgraph"))
+      (ps/write-stat-file genome "test/output/multis.csv" :multis)
+      (ps/write-stat-file genome "test/output/circs.csv" :circulars))))

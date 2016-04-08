@@ -93,24 +93,13 @@
                         (if (:circular options) pressspan.graph/remember-circular)
                         (:add-all funs)]
             drop-graphs (pressspan.visualise/drop-filter (:drop options))
-            range-check (if-not (:range options)
-                          (fn [_] true) ; dummy function returning true
-                          (let [range-str (:range options)
-                                tokens (clojure.string/split (clojure.string/join (rest range-str)) #"[:-]")
-                                strand (if (= \+ (first range-str)) :plus :minus)
-                                dummy (println "#### TOKENS:" tokens)
-                                chr (first tokens)
-                                lower (Integer. (second tokens))
-                                upper (Integer. (last tokens))]
-                            (pressspan.visualise/range-filter chr strand lower upper)))
-            
             funs (assoc funs :add-all input-funs)]
         (->
-         (time (pressspan.graph/create-genome (:in options) funs))
-         (pressspan.visualise/write-files :multis (:out options) (:trunc options) [range-check drop-graphs])
-         (pressspan.visualise/write-files :circulars (:out options) (:trunc options) [range-check drop-graphs])
-         (pressspan.statistics/write-stat-file (str (:out options) "/multistrand.csv") :multis (:bins options))
-         (pressspan.statistics/write-stat-file (str (:out options) "/circulars.csv") :circulars (:bins options))))
+         (time (pressspan.graph/create-genome (:in options) funs (:bins options)))
+         (pressspan.visualise/write-files :multis (:out options) (:trunc options) [drop-graphs])
+         (pressspan.visualise/write-files :circulars (:out options) (:trunc options) [drop-graphs])
+         (pressspan.statistics/write-stat-file (str (:out options) "/multistrand.csv") :multis)
+         (pressspan.statistics/write-stat-file (str (:out options) "/circulars.csv") :circulars)))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
                "format. Why don't you create them?"))
