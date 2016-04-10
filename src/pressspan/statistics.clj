@@ -7,7 +7,6 @@
   (let [id (first input)
         len (:len (second input))
         n (if (seq? n) (first n) n)]
-    (println "len" (type len) len "n" (type n) n)
     {id
      {:id id
       :bsize (max 1 (int (/ len n)))
@@ -41,12 +40,15 @@
 (defn increase
   "Increase number of counts for element"
   [root stat chr pos dir]
-  (dosync
-   (let [bs (get-in @stat [chr :bsize])
-         pos (int (if (= :plus dir)
-                    (/ pos bs)
-                    (/ (- (get-in @root [chr :len]) pos) bs)))]
-     (commute stat update-in [chr :vals pos] inc))))
+  (if (and root stat chr (number? pos) dir)
+      (dosync
+       (let [bs (get-in @stat [chr :bsize])
+             pos (int (if (= :plus dir)
+                        (/ pos bs)
+                        (/ (- (get-in @root [chr :len]) pos) bs)))]
+         (if (get-in @stat [chr :vals pos])
+           (commute stat update-in [chr :vals pos] inc)
+           (println "Warning: Could not count match at" chr pos))))))
 
 (defn write-stat-file
   "Generate a statistics table for a event type from a genome and
