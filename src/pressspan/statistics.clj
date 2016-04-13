@@ -9,7 +9,7 @@
         n (if (seq? n) (first n) n)]
     {id
      {:id id
-      :bsize (max 1 (int (/ len n)))
+      :bsize (max 1 (inc (int (/ len n))))
       :vals (vec (take n (cycle [0])))}}))
 
 (defn empty-stats

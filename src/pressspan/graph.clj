@@ -1,11 +1,22 @@
 (ns pressspan.graph
   (:require [clojure.data.int-map :as im]
             [pressspan.statistics :as stats]
+            [clojure.core.async
+             :as a
+             :refer [>! <! >!! <!! go chan close! thread
+                     alts! alts!! timeout go-loop put!]]
             pressspan.io)
   (:use [clojure.set :only [difference union]]
         clojure.test
         ))
 
+(def frag-chan (chan 10))
+(def mult-chan (chan 10))
+(def circ-chan (chan 10))
+(declare mult-freqs
+         circ-freqs)
+
+(def parsing-done (atom 0))
 
 (defn id-valid? [root id] (and (number? id) (>= id 0) (<= id (:nf @root))))
 
@@ -95,7 +106,6 @@
                   (update-in [:frags dn-id :up] into [link-id])))))))
 
 
-(declare mult-freqs)
 (defn remember-multistrand
   [genome frag]
   (when-let [next (:next frag)]
@@ -104,8 +114,8 @@
              (= (:dir frag) (:dir next))); multistrand if elements on different strands
       (dosync
        (commute genome update-in [:multis] conj (:id frag)))
-      (stats/increase genome mult-freqs (:chr frag) (:p3 frag) (:dir frag))
-      (stats/increase genome mult-freqs (:chr next) (:p5 next) (:dir next))))
+      (go (>! mult-chan [(:chr frag) (:p3 frag) (:dir frag)])
+          (>! mult-chan [(:chr next) (:p5 next) (:dir next)]))))
   frag)
 
 
@@ -116,12 +126,12 @@
     (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
       (when ((every-pred true?)
       				 (= (:dir frag) (:dir (:next frag)))
-               (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand and
+               (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand andh
                (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync
          (commute genome update-in [:circulars] conj (:id frag)))
-        (stats/increase genome mult-freqs (:chr frag) (:p3 frag) (:dir frag))
-        (stats/increase genome mult-freqs (:chr next) (:p5 next) (:dir next)))))
+        (go (>! circ-chan [(:chr frag) (:p3 frag) (:dir frag)])
+            (>! circ-chan [(:chr next) (:p5 next) (:dir next)])))))
   frag)
 
 
@@ -152,8 +162,39 @@
   (let [add-frag (filter identity (:add-all funs))
         add-frag (mapv #(partial % root) add-frag)
         add-frag (reduce comp add-frag)]
+    ;; explicitly specify tree-building thread
+    (thread ;; extra thread because called for every frag
+      (loop []
+        (let [[frag _] (alts!! [frag-chan])]
+          (if-not (= frag :done)
+            (do (add-frag frag)
+                (recur))
+            (swap! parsing-done inc)))))
+
+    ;; explicitly specify event-counting threads
+    (go-loop []
+      (let [[data _] (alts! [mult-chan])]
+        (if-not (= data :done)
+          (do (let [[chr pos dir] data]
+                (stats/increase root mult-freqs chr pos dir))
+              (recur))
+          (swap! parsing-done inc))))
+    (go-loop []
+      (let [[data _] (alts! [circ-chan])]
+        (if-not (= data :done)
+          (do (let [[chr pos dir] data]
+                (stats/increase root circ-freqs chr pos dir))
+              (recur))
+          (swap! parsing-done inc))))
+
+    ;; feed parsed fragments to fragment channel
     (doseq [line (drop-while (:head? funs) lines)]
-      (add-frag ((:data-parser funs) line)))))
+      (>!! frag-chan ((:data-parser funs) line)))
+    ;; send threads ending signals
+    (>!! frag-chan :done)
+    (>!! mult-chan :done)
+    (>!! circ-chan :done)
+    (while (< @parsing-done 3) (Thread/sleep 10))))
 
 (defn create-genome
   [filename funs & bins]
@@ -164,8 +205,8 @@
         file (pressspan.io/lazy-file filename)]
     (assert (seq? file))
     (println "Processing header" \newline)
-    (time (parse-header genome file funs))
-    ;; Create new parallel data...
+    (parse-header genome file funs) ;; add header information to genome
+    ;; Create new parallelly accessible data...
     (def circ-freqs (ref (stats/empty-stats @genome (or bins 10000))))
     (def mult-freqs (ref (stats/empty-stats @genome (or bins 10000))))
     (println "Processing data...")
