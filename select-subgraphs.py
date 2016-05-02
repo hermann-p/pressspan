@@ -1,4 +1,4 @@
-# /usr/bin/env python3
+#!/usr/bin/env python3
 
 import re, sys, os, shutil
 from subprocess import call
