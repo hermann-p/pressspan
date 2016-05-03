@@ -17,10 +17,7 @@
    ["-o" "--out PATH_TO_FILE" "Output file name prefix"
     :default "pressspan_analysis"
     :default-desc "pressspan_analysis"]
-   ["-r" "--range CHR:start:stop" "Output reads with fragments matching the range."
-    :validate [#({\+ \-} (first %)) "Range must start with strandiness symbol from {+, -}"
-               #(= 3 (count (clojure.string/split (clojure.string/join (rest %)) #"[:-]"))) "Format: (+/-)chr:lower-upper"]
-    :default-desc "(+/-)chr:lower-upper"]
+   ["-S" "--stats" "Write event statistics CSV files"]
    ["-d" "--drop DEPTH" "Drop isoform trees containing links with read depth lower than DEPTH"
     :default 1
     :parse-fn #(Integer/parseInt %)
@@ -69,7 +66,6 @@
   (System/exit (or stat 1)))
 
 
-
 (defn -main
   [& args]
   (if-not [seq args] 
@@ -98,8 +94,9 @@
          (time (pressspan.graph/create-genome (:in options) funs (:bins options)))
          (pressspan.visualise/write-files :multis (:out options) (:trunc options) [drop-graphs])
          (pressspan.visualise/write-files :circulars (:out options) (:trunc options) [drop-graphs])
-         (pressspan.statistics/write-stat-file (str (:out options) "/multistrand.csv") :multis)
-         (pressspan.statistics/write-stat-file (str (:out options) "/circulars.csv") :circulars)))
+         (#(when (:stats options)
+             (pressspan.statistics/write-stat-file % (str (:out options) "/multistrand.csv") :multis)
+             (pressspan.statistics/write-stat-file % (str (:out options) "/circulars.csv") :circulars)))))
       (println "No functions known to treat" 
                (last (clojure.string/split (:in options) #"\.")) ; get file extension
                "format. Why don't you create them?"))

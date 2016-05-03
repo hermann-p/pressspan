@@ -110,8 +110,9 @@
   [genome frag]
   (when-let [next (:next frag)]
     (when-not (and
-             (= (:chr frag) (:chr next))
-             (= (:dir frag) (:dir next))); multistrand if elements on different strands
+               (nil? (:chr next))
+               (= (:chr frag) (:chr next))
+               (= (:dir frag) (:dir next))); multistrand if elements on different strands
       (dosync
        (commute genome update-in [:multis] conj (:id frag)))
       (go (>! mult-chan [(:chr frag) (:p3 frag) (:dir frag)])
@@ -125,9 +126,9 @@
   (if-let [next-p5 (:p5 (:next frag))]
     (let [is-upstream? (if (= :plus (:dir frag)) < >)] ; define upstream-test
       (when ((every-pred true?)
-      				 (= (:dir frag) (:dir (:next frag)))
-               (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand andh
-               (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
+             (= (:dir frag) (:dir (:next frag)))
+             (= (:chr frag) (:chr (:next frag)))     ; circular if on same strand andh
+             (is-upstream? next-p5 (:p5 frag)))      ; next frag starts upstream on same strand
         (dosync
          (commute genome update-in [:circulars] conj (:id frag)))
         (go (>! circ-chan [(:chr frag) (:p3 frag) (:dir frag)])
@@ -147,18 +148,22 @@
 
 
 (defn parse-header
-  [root lines funs]; [{:keys [head? header-parser]}]]
-  (doseq [line lines :while ((:head? funs) line)]
-    (if-let [chromosome ((:header-parser funs) line)]
-      (do
-        (println "Chromosome:" chromosome)
-        (create-chr root (:id chromosome) (:len chromosome)))
-      (println line)))
+  [root filename funs]; [{:keys [head? header-parser]}]]
+  (with-open [file (clojure.java.io/reader filename)]
+    (loop [lines (line-seq file)]
+      (when-let [line (first lines)]
+        (if-let [chromosome ((:header-parser funs) line)]
+          (do
+            (println "Chromosome:" chromosome)
+            (create-chr root (:id chromosome) (:len chromosome)))
+          (println line))
+        (if ((:head? funs) line) (recur (rest lines))))))
   root)
 
 
 (defn parse-data
-  [root lines funs];[{:keys [head? data-parser add-all]}]]
+  [root filename funs];[{:keys [head? data-parser add-all]}]]
+  (reset! parsing-done 0)
   (let [add-frag (filter identity (:add-all funs))
         add-frag (mapv #(partial % root) add-frag)
         add-frag (reduce comp add-frag)]
@@ -172,28 +177,34 @@
             (swap! parsing-done inc)))))
 
     ;; explicitly specify event-counting threads
-    (go-loop []
-      (let [[data _] (alts! [mult-chan])]
-        (if-not (= data :done)
-          (do (let [[chr pos dir] data]
-                (stats/increase root mult-freqs chr pos dir))
-              (recur))
-          (swap! parsing-done inc))))
-    (go-loop []
-      (let [[data _] (alts! [circ-chan])]
-        (if-not (= data :done)
-          (do (let [[chr pos dir] data]
-                (stats/increase root circ-freqs chr pos dir))
-              (recur))
-          (swap! parsing-done inc))))
+    (thread
+      (loop []
+        (let [[data _] (alts!! [mult-chan])]
+          (if-not (= data :done)
+            (do (let [[chr pos dir] data]
+                  (stats/increase root mult-freqs chr pos dir))
+                (recur))
+            (swap! parsing-done inc)))))
+    (thread
+      (loop []
+        (let [[data _] (alts!! [circ-chan])]
+          (if-not (= data :done)
+            (do (let [[chr pos dir] data]
+                  (stats/increase root circ-freqs chr pos dir))
+                (recur))
+            (swap! parsing-done inc)))))
 
     ;; feed parsed fragments to fragment channel
-    (doseq [line (drop-while (:head? funs) lines)]
-      (>!! frag-chan ((:data-parser funs) line)))
+    (with-open [file (clojure.java.io/reader filename)]
+      (loop [lines (drop-while (:head? funs) (line-seq file))]
+        (when-let [line (first lines)]
+          (>!! frag-chan ((:data-parser funs) line))
+          (recur (rest lines)))))
     ;; send threads ending signals
     (>!! frag-chan :done)
     (>!! mult-chan :done)
     (>!! circ-chan :done)
+    ;; wait for all channels to finish
     (while (< @parsing-done 3) (Thread/sleep 10))))
 
 (defn create-genome
@@ -202,15 +213,16 @@
   (let [genome (ref {:frags (im/int-map), :nf 0
                      :links (im/int-map), :nl 0
                      :circulars (im/int-set), :multis (im/int-set)})
-        file (pressspan.io/lazy-file filename)]
-    (assert (seq? file))
+        ;; file (pressspan.io/lazy-file filename)
+        ]
+    ;;(assert (seq? file))
     (println "Processing header" \newline)
-    (parse-header genome file funs) ;; add header information to genome
+    (parse-header genome filename funs) ;; add header information to genome
     ;; Create new parallelly accessible data...
     (def circ-freqs (ref (stats/empty-stats @genome (or bins 10000))))
     (def mult-freqs (ref (stats/empty-stats @genome (or bins 10000))))
     (println "Processing data...")
-    (time (parse-data genome file funs))
+    (time (parse-data genome filename funs))
     (println "File read.")
     (-> @genome
         (assoc :mstat @mult-freqs

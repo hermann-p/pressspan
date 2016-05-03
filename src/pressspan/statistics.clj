@@ -56,19 +56,20 @@
   type of events"
   [genome file-name seed-key]
   (let [stats (sort (if (= :multis seed-key) (genome :mstat) (genome :cstat)))]
-    (println "Writing statistics:" file-name)
-    (with-open [wrtr (writer file-name)]
-      (.write wrtr (clojure.string/join "\t" (keys stats)))
-      (.write wrtr "\n")
-      (.write wrtr (clojure.string/join "\t" (get-bucket-sizes stats)))
-      (.write wrtr "\n")
-      (let [stats (map second stats)]
-        (loop [rem (map :vals stats)]
-          (when (seq (first rem))
-            (.write wrtr
-                    (clojure.string/join
-                     "\t"
-                     (map first rem)))
-            (.write wrtr "\n")
-            (recur (map rest rem)))))))
+    (when-not (zero? (count (get genome (if (= :multis seed-key) :multis :circulars))))
+        (println "Writing statistics:" file-name)
+     (with-open [wrtr (writer file-name)]
+       (.write wrtr (clojure.string/join "\t" (keys stats)))
+       (.write wrtr "\n")
+       (.write wrtr (clojure.string/join "\t" (get-bucket-sizes stats)))
+       (.write wrtr "\n")
+       (let [stats (map second stats)]
+         (loop [rem (map :vals stats)]
+           (when (seq (first rem))
+             (.write wrtr
+                     (clojure.string/join
+                      "\t"
+                      (map first rem)))
+             (.write wrtr "\n")
+             (recur (map rest rem))))))))
   genome)
