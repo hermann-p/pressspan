@@ -55,12 +55,15 @@
                            [:mp5frags (im/int-map)]])))))
 
 
+(defrecord Fragment [chr p3 p5 dir id next prev])
+
 (defn create-el
 	[root {:keys [chr p3 p5 dir]}]
     (dosync 	
       (let [[l3 l5] (if (= dir :plus) [:p3frags :p5frags] [:mp3frags :mp5frags])
            id (:nf @root)
-           new-el {:chr chr :p3 p3 :p5 p5 :dir dir :id id}]
+           ;new-el {:chr chr :p3 p3 :p5 p5 :dir dir :id id}
+           new-el (Fragment. chr p3 p5 dir id nil nil) ]
         (alter root
                #(-> %
                   (update-in [chr l3] into [[p3 id]])
@@ -84,16 +87,19 @@
   (get-in @root [:links (get-link-id root up-id dn-id)]))
 
 
+(defrecord Link [down depth id up])
+
 (defn link-frags
-  [root up-id dn-id & count]
+  [root up-id dn-id & cnt]
   (assert (id-valid? root up-id) "Invalid upstream-fragment-id")
   (assert (id-valid? root dn-id) "Invalid downstream-fragment-id")
   (if-let [link-id (get-link-id root up-id dn-id)]
-      (if count (dosync (commute root update-in [:links link-id :depth] inc)))
+      (if cnt (dosync (commute root update-in [:links link-id :depth] inc)))
     ;; else create new link
     (dosync
       (let [link-id (get-in @root [:nl])
-            link {:down dn-id :depth (if count 1 0) :id link-id :up up-id}]
+            ;link {:down dn-id :depth (if cnt 1 0) :id link-id :up up-id}
+            link (Link. dn-id (if cnt 1 0) link-id up-id)]
         (if-not (get-in @root [:frags up-id :down])
           (alter root assoc-in [:frags up-id :down] (im/int-set)))
         (if-not (get-in @root [:frags dn-id :up])

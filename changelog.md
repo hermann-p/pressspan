@@ -1,6 +1,7 @@
-# [planned]
+# [2016-06-02]
 
 - modify data types for speed
+- make statistics output optional
 
 # [2016-04-08] Version 0.1.2
 

@@ -84,8 +84,8 @@
         	{:chr nchr
          		:p5 (Integer. (:XV sm))
          		:dir (if (= "0" (:XT sm))
-                :minus
-                :plus)})
+                               :minus
+                               :plus)})
      }))
 
 (deftest sam-processing-test
